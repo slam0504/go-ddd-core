@@ -102,8 +102,8 @@ func run() error {
 func registerRoutes(mux *http.ServeMux, cmdBus *command.InMemoryBus, qryBus *query.InMemoryBus) {
 	mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			OrderID    string           `json:"order_id"`
-			CustomerID string           `json:"customer_id"`
+			OrderID    string          `json:"order_id"`
+			CustomerID string          `json:"customer_id"`
 			Items      []orderdom.Item `json:"items"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

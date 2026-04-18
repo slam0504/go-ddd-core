@@ -20,8 +20,8 @@ const (
 
 // Item is a value object within the Order aggregate.
 type Item struct {
-	SKU      string
-	Quantity int
+	SKU        string
+	Quantity   int
 	PriceCents int64
 }
 

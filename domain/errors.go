@@ -6,10 +6,10 @@ import "errors"
 // translating technology-specific errors so that application code can
 // pattern-match on domain semantics only.
 var (
-	ErrNotFound         = errors.New("domain: aggregate not found")
+	ErrNotFound            = errors.New("domain: aggregate not found")
 	ErrConcurrencyConflict = errors.New("domain: concurrency conflict")
-	ErrInvalidArgument  = errors.New("domain: invalid argument")
-	ErrRuleViolation    = errors.New("domain: business rule violation")
+	ErrInvalidArgument     = errors.New("domain: invalid argument")
+	ErrRuleViolation       = errors.New("domain: business rule violation")
 )
 
 // RuleViolation is a domain-level error that carries a machine-readable code

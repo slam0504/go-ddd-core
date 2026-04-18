@@ -65,9 +65,9 @@ type GRPC struct {
 
 // GraphQL configures the GraphQL adapter.
 type GraphQL struct {
-	Driver    string `mapstructure:"driver"` // e.g. "gqlgen", "graphql-go"
-	Path      string `mapstructure:"path"`   // HTTP path to mount
-	Playground bool  `mapstructure:"playground"`
+	Driver     string `mapstructure:"driver"` // e.g. "gqlgen", "graphql-go"
+	Path       string `mapstructure:"path"`   // HTTP path to mount
+	Playground bool   `mapstructure:"playground"`
 }
 
 // Database selects and configures a persistence adapter.
@@ -89,10 +89,10 @@ type Cache struct {
 
 // Messaging selects a watermill driver (kafka, nats, redis, etc.).
 type Messaging struct {
-	Driver    string            `mapstructure:"driver"`
-	Brokers   []string          `mapstructure:"brokers"`
-	ConsumerGroup string        `mapstructure:"consumer_group"`
-	Options   map[string]string `mapstructure:"options"`
+	Driver        string            `mapstructure:"driver"`
+	Brokers       []string          `mapstructure:"brokers"`
+	ConsumerGroup string            `mapstructure:"consumer_group"`
+	Options       map[string]string `mapstructure:"options"`
 }
 
 // Storage selects an object storage adapter.

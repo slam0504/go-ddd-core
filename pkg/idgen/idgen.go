@@ -20,7 +20,7 @@ func (f GeneratorFunc) New() string { return f() }
 
 // UUIDv4 returns a Generator producing random UUIDs.
 func UUIDv4() Generator {
-	return GeneratorFunc(func() string { return uuid.NewString() })
+	return GeneratorFunc(uuid.NewString)
 }
 
 // UUIDv7 returns a Generator producing time-ordered UUIDv7 values. Falls
