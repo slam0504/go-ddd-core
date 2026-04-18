@@ -1,0 +1,21 @@
+app:
+  name: minimal-example
+  env: dev
+  version: 0.1.0
+
+logger:
+  driver: slog
+  level: info
+  format: json
+
+http:
+  driver: stdlib
+  addr: ":8080"
+  read_timeout: 5s
+  write_timeout: 10s
+  shutdown_timeout: 10s
+
+messaging:
+  driver: watermill-inmem
+  brokers: []
+  consumer_group: minimal-example
