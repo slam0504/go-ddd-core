@@ -15,8 +15,9 @@ type Router struct {
 	sub         Subscriber
 	middlewares []Middleware
 
-	mu       sync.RWMutex
-	handlers map[string][]DispatchFunc
+	mu        sync.RWMutex
+	handlers  map[string][]DispatchFunc
+	onUnknown func(ctx context.Context, env Envelope)
 }
 
 // NewRouter constructs a Router that pulls from sub. Middlewares wrap every
@@ -27,6 +28,17 @@ func NewRouter(sub Subscriber, mws ...Middleware) *Router {
 		middlewares: mws,
 		handlers:    make(map[string][]DispatchFunc),
 	}
+}
+
+// OnUnknown installs a callback invoked when an envelope's event name has no
+// registered handler. The default behaviour is to silently ack such messages
+// (a consumer may deliberately share a topic with unrelated events); set a
+// callback to log, count, or route them elsewhere. The callback runs before
+// the envelope is acked; returning does not block the router loop.
+func (r *Router) OnUnknown(fn func(ctx context.Context, env Envelope)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onUnknown = fn
 }
 
 // RegisterHandler registers a type-erased dispatcher for an event name.
@@ -77,8 +89,12 @@ func (r *Router) Run(ctx context.Context, topic string) error {
 func (r *Router) dispatch(ctx context.Context, env Envelope) error {
 	r.mu.RLock()
 	fns := r.handlers[env.Name]
+	onUnknown := r.onUnknown
 	r.mu.RUnlock()
 	if len(fns) == 0 {
+		if onUnknown != nil {
+			onUnknown(ctx, env)
+		}
 		return nil
 	}
 	for _, fn := range fns {

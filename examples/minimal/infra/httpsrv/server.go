@@ -6,7 +6,9 @@ package httpsrv
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -16,6 +18,7 @@ type Server struct {
 	mux             *http.ServeMux
 	srv             *http.Server
 	shutdownTimeout time.Duration
+	errCh           chan error
 }
 
 // New constructs a Server bound to addr.
@@ -26,22 +29,31 @@ func New(addr string, shutdownTimeout time.Duration) *Server {
 		mux:             mux,
 		srv:             &http.Server{Addr: addr, Handler: mux},
 		shutdownTimeout: shutdownTimeout,
+		errCh:           make(chan error, 1),
 	}
 }
 
 // Mux exposes the underlying mux for route registration.
 func (s *Server) Mux() *http.ServeMux { return s.mux }
 
-// Start begins listening in a goroutine.
+// Start begins listening in a goroutine. Listener failures (port in use,
+// bind errors) are surfaced both via stderr and the Err channel so callers
+// can react during the lifecycle.
 func (s *Server) Start(_ context.Context) error {
 	go func() {
 		if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			// in a real adapter we would surface this via the lifecycle.
-			_ = err
+			fmt.Fprintf(os.Stderr, "httpsrv: listen on %s failed: %v\n", s.addr, err)
+			s.errCh <- err
+			return
 		}
+		close(s.errCh)
 	}()
 	return nil
 }
+
+// Err returns a channel that receives the first fatal listener error and is
+// then closed. Closed without a value means shutdown completed cleanly.
+func (s *Server) Err() <-chan error { return s.errCh }
 
 // Stop gracefully shuts the server down.
 func (s *Server) Stop(ctx context.Context) error {

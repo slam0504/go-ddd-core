@@ -30,8 +30,21 @@ type Envelope struct {
 	Raw   *message.Message
 }
 
-// Ack acknowledges successful processing of the underlying message.
-func (e Envelope) Ack() { e.Raw.Ack() }
+// Ack acknowledges successful processing of the underlying message. It is a
+// no-op when Raw is nil, which lets tests and in-memory fan-out consumers
+// build synthetic envelopes without wiring a watermill message.
+func (e Envelope) Ack() {
+	if e.Raw == nil {
+		return
+	}
+	e.Raw.Ack()
+}
 
-// Nack signals processing failure so the broker can redeliver.
-func (e Envelope) Nack() { e.Raw.Nack() }
+// Nack signals processing failure so the broker can redeliver. It is a no-op
+// when Raw is nil, see Ack for the rationale.
+func (e Envelope) Nack() {
+	if e.Raw == nil {
+		return
+	}
+	e.Raw.Nack()
+}

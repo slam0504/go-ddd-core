@@ -2,7 +2,7 @@ package eventsourcing
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/slam0504/go-ddd-core/domain"
 )
@@ -53,5 +53,7 @@ type AllStream interface {
 	SubscribeAll(ctx context.Context, fromPosition int64) (<-chan PersistedEvent, error)
 }
 
-// ErrConcurrency is returned on optimistic concurrency violations.
-var ErrConcurrency = errors.New("eventsourcing: concurrency conflict")
+// ErrConcurrency is returned on optimistic concurrency violations. It wraps
+// domain.ErrConcurrencyConflict so downstream code can match a single
+// sentinel via errors.Is regardless of which layer produced the error.
+var ErrConcurrency = fmt.Errorf("eventsourcing: %w", domain.ErrConcurrencyConflict)
