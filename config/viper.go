@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -19,6 +20,13 @@ type Source struct {
 	// EnvPrefix is the prefix for env-based overrides (for env sources).
 	EnvPrefix string
 	// Watch enables live reload for file sources.
+	//
+	// Limitation: viper.WatchConfig watches only the file most recently
+	// bound via SetConfigFile, and OnConfigChange installs a single global
+	// callback. When multiple file sources set Watch: true, only the last
+	// one is reload-watched and only the last OnConfigChange callback
+	// survives. Services needing multi-file reload should build their own
+	// fsnotify.Watcher instead.
 	Watch bool
 }
 
@@ -32,7 +40,9 @@ type ViperOptions struct {
 // ViperProvider is the default Provider backed by spf13/viper. It supports
 // yaml files and environment variable overrides.
 type ViperProvider struct {
-	v         *viper.Viper
+	v *viper.Viper
+
+	mu        sync.RWMutex
 	listeners []func()
 }
 
@@ -56,11 +66,7 @@ func NewViperProvider(opts ViperOptions) (*ViperProvider, error) {
 				return nil, fmt.Errorf("config: read file %q: %w", src.Path, err)
 			}
 			if src.Watch {
-				v.OnConfigChange(func(_ fsnotify.Event) {
-					for _, fn := range p.listeners {
-						fn()
-					}
-				})
+				v.OnConfigChange(func(_ fsnotify.Event) { p.fireListeners() })
 				v.WatchConfig()
 			}
 		case "env":
@@ -87,9 +93,25 @@ func (p *ViperProvider) Load(_ context.Context, dest any) error {
 // Get returns the raw value at path.
 func (p *ViperProvider) Get(path string) any { return p.v.Get(path) }
 
-// OnChange registers a callback invoked after a file-source reload.
+// OnChange registers a callback invoked after a file-source reload. Safe to
+// call concurrently with the fsnotify watcher goroutine that fires listeners.
 func (p *ViperProvider) OnChange(fn func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.listeners = append(p.listeners, fn)
+}
+
+// fireListeners snapshots the current listener set under the read lock and
+// invokes each callback outside the lock so a long-running callback cannot
+// block new OnChange registrations.
+func (p *ViperProvider) fireListeners() {
+	p.mu.RLock()
+	fns := make([]func(), len(p.listeners))
+	copy(fns, p.listeners)
+	p.mu.RUnlock()
+	for _, fn := range fns {
+		fn()
+	}
 }
 
 // Viper exposes the underlying viper.Viper for advanced cases. Avoid using

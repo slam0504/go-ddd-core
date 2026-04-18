@@ -84,21 +84,41 @@ func (a *App) Get(key string) (any, bool) {
 }
 
 // Use appends modules to the App. Modules start in registration order.
+// Use takes the App mutex so it is safe to call from multiple goroutines,
+// but the intended usage is to call it only on the main goroutine before
+// Start; mid-flight Use calls made concurrently with Start have undefined
+// ordering relative to already-started modules.
 func (a *App) Use(modules ...Module) *App {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.modules = append(a.modules, modules...)
 	return a
 }
 
-// Start boots all modules in order. Callers typically prefer Run which also
-// blocks on signals and orchestrates shutdown.
+// Start boots all modules in order, then runs any additional Lifecycle
+// start hooks registered by modules during their own Start. Execution order:
+//
+//  1. Each Module.Start runs in registration order. On the first error,
+//     startup halts and the caller is expected to Stop to unwind.
+//  2. For every Module that started successfully, a stop hook is appended
+//     to the Lifecycle so Stop can tear it down in reverse order.
+//  3. Any extra start hooks registered via App.Lifecycle().AppendStart
+//     during step 1 run last, in registration order.
+//
+// Callers typically prefer Run, which also blocks on signals.
 func (a *App) Start(ctx context.Context) error {
-	for _, m := range a.modules {
+	a.mu.RLock()
+	modules := make([]Module, len(a.modules))
+	copy(modules, a.modules)
+	a.mu.RUnlock()
+
+	for _, m := range modules {
 		name := m.Name()
 		if err := m.Start(ctx, a); err != nil {
 			return fmt.Errorf("bootstrap: start module %q: %w", name, err)
 		}
 		mod := m
-		a.lifecycle.Append(Hook{}, Hook{
+		a.lifecycle.AppendStop(Hook{
 			Name: name,
 			Run:  func(sctx context.Context) error { return mod.Stop(sctx) },
 		})

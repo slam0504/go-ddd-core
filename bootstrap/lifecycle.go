@@ -33,6 +33,20 @@ func (l *Lifecycle) Append(start, stop Hook) {
 	}
 }
 
+// AppendStart registers only a start hook.
+func (l *Lifecycle) AppendStart(h Hook) {
+	if h.Run != nil {
+		l.starts = append(l.starts, h)
+	}
+}
+
+// AppendStop registers only a stop hook.
+func (l *Lifecycle) AppendStop(h Hook) {
+	if h.Run != nil {
+		l.stops = append(l.stops, h)
+	}
+}
+
 // Start runs all registered start hooks in order, stopping on the first error.
 func (l *Lifecycle) Start(ctx context.Context) error {
 	for _, h := range l.starts {

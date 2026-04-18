@@ -39,6 +39,20 @@ func TestWithDetailAttaches(t *testing.T) {
 	}
 }
 
+func TestWithDetail_DoesNotMutateReceiver(t *testing.T) {
+	sentinel := errorsx.New(errorsx.CodeNotFound, "not found")
+
+	withA := sentinel.WithDetail("id", "a")
+	withB := sentinel.WithDetail("id", "b")
+
+	if len(sentinel.Details) != 0 {
+		t.Fatalf("sentinel mutated: %v", sentinel.Details)
+	}
+	if withA.Details["id"] != "a" || withB.Details["id"] != "b" {
+		t.Fatalf("derived errors cross-contaminated: %v / %v", withA.Details, withB.Details)
+	}
+}
+
 func TestCodeOf_UnknownForPlainError(t *testing.T) {
 	if got := errorsx.CodeOf(errors.New("x")); got != errorsx.CodeUnknown {
 		t.Fatalf("CodeOf(plain) = %v, want unknown", got)

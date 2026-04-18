@@ -6,6 +6,7 @@ package errorsx
 import (
 	"errors"
 	"fmt"
+	"maps"
 )
 
 // Code is a stable identifier for an error category. Transport adapters map
@@ -51,13 +52,18 @@ func Wrap(code Code, msg string, cause error) *Error {
 	return &Error{Code: code, Message: msg, cause: cause}
 }
 
-// WithDetail returns a copy of e with the given detail attached.
+// WithDetail returns a shallow copy of e with the given detail attached.
+// The Details map is cloned so callers sharing a base *Error (for example a
+// package-level sentinel) do not pollute each other's details.
 func (e *Error) WithDetail(key string, value any) *Error {
-	if e.Details == nil {
-		e.Details = map[string]any{}
+	cp := *e
+	if e.Details != nil {
+		cp.Details = maps.Clone(e.Details)
+	} else {
+		cp.Details = map[string]any{}
 	}
-	e.Details[key] = value
-	return e
+	cp.Details[key] = value
+	return &cp
 }
 
 // CodeOf returns the Code of err or CodeUnknown if err is not an *Error.
