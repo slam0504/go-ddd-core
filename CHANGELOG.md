@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-19
+
+Documentation-only release that complements v0.2.0. Where v0.2.0 added the
+APIs that make good designs easy, v0.2.1 names the anti-patterns those
+APIs were built to displace, so reviewers and new readers know which
+shortcuts to refuse.
+
+### Added
+
+- `docs/anti-patterns.md` — seven production anti-patterns (service
+  locator inside use cases, static facade over infrastructure, anemic
+  aggregate, map-typed query/patch, dual error wrapping, at-least-once
+  only on the producer side, ORM tags inside domain entities) with the
+  concrete core API that replaces each.
+- `docs/aggregate-design.md` — rule-of-thumb guide on rich vs anemic
+  aggregates, when to record domain events, when to split inner entities
+  vs value objects vs separate aggregates, plus a worked `BankAccount`
+  example that lives as compilable code in
+  `examples/minimal/domain/account/` (21 tests covering every invariant)
+  so the documentation cannot drift from the API.
+- `examples/minimal/domain/account/` — second worked aggregate alongside
+  Order, exercising multi-rule methods (Withdraw checks status, sign,
+  overdraft), status-gated mutations (Freeze blocks Withdraw but not
+  Deposit), and constructor-time invariant enforcement.
+- `application/usecase/usecase.go` package doc — explicit warning that a
+  UseCase merely shuttling fields between handler and repository is the
+  anemic-application-service anti-pattern, with pointers to the new docs.
+- `README.md` — new "Design discipline" section linking the anti-pattern
+  catalogue and aggregate guide.
+
+### Changed
+
+Nothing. No code or API changes; safe drop-in upgrade from v0.2.0.
+
+[0.2.1]: https://github.com/slam0504/go-ddd-core/releases/tag/v0.2.1
+
 ## [0.2.0] - 2026-04-18
 
 Production-ready augmentation. v0.2.0 fills the "last mile" for CRUD-heavy

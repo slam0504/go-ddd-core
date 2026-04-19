@@ -5,6 +5,20 @@
 // and dispatch infrastructure (middleware chain, audit logging, transaction
 // wrapping) is not needed. When those concerns matter, prefer
 // application/command.Handler[C, R] together with a Bus.
+//
+// # What a UseCase is for
+//
+// A UseCase orchestrates domain objects to express a business intent: it
+// loads aggregates, calls their methods, dispatches the resulting events,
+// and coordinates multiple repositories within a unit of work. It is the
+// thin layer between a transport handler and the domain model — not a
+// place to put business rules.
+//
+// Anti-pattern: a UseCase that merely shuttles fields between an HTTP
+// request and a repository call (the "anemic application service") is a
+// sign that the surrounding aggregate is anemic. The rule belongs on the
+// aggregate, not on the use case. See docs/anti-patterns.md (anti-pattern
+// #3) and docs/aggregate-design.md for the alternative.
 package usecase
 
 import (

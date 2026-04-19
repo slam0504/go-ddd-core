@@ -43,6 +43,8 @@ examples/                 Minimal runnable example
 docs/
   grpc.md                 gRPC integration guide [v0.2.0]
   graphql.md              GraphQL integration guide [v0.2.0]
+  anti-patterns.md        Anti-patterns this core helps avoid [v0.2.1]
+  aggregate-design.md     Rich aggregate design + worked example [v0.2.1]
 ```
 
 ## Requirements
@@ -112,3 +114,16 @@ The GraphQL helpers in `transport/graphql` (Relay Connection cursor codec,
 `FilterInput` → `Specification` walker) are designed to plug into the same
 `pagination` and `spec` types. See [`docs/graphql.md`](docs/graphql.md) for
 the full integration guide.
+
+## Design discipline
+
+Several APIs in this core exist *because* a specific anti-pattern hurt in
+production. The full list, with concrete substitutes, lives in
+[`docs/anti-patterns.md`](docs/anti-patterns.md): service locator inside
+use cases, static facades over infrastructure, anemic aggregates,
+map-typed query/patch, dual error wrapping, half-implemented at-least-once
+delivery, ORM tags inside domain entities.
+
+For the positive counterpart — what a rich aggregate looks like and how
+to enforce invariants on it — see
+[`docs/aggregate-design.md`](docs/aggregate-design.md).
