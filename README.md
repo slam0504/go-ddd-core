@@ -16,16 +16,33 @@ Downstream services pick concrete adapters and wire them via config.
 ## Layout
 
 ```
-domain/          DDD base types (Entity, AggregateRoot, DomainEvent, Repository)
-application/     CQRS primitives (Command/Query bus, UnitOfWork)
-eventsourcing/   EventStore, SnapshotStore, Projector
-eventbus/        Publisher/Subscriber (watermill contract), Outbox, Inbox
-ports/           Infra interfaces (logger, cache, database, storage, httpclient, observability)
-transport/       Server contracts (http, grpc, graphql)
-config/          Config Provider (viper-backed), shared schema
-bootstrap/       App container, Module, AdapterRegistry, lifecycle
-pkg/             contextx, errorsx, idgen
-examples/        Minimal runnable example
+domain/                   DDD base types (Entity, AggregateRoot, DomainEvent,
+                          ValueObject + helpers, Repository)
+application/
+  command/                Command bus, Handler, Middleware (NameOf since v0.2.0)
+  query/                  Query bus mirror (NameOf since v0.2.0)
+  query/spec/             Specification pattern (And/Or/Not + opt-in SQLTranslatable) [v0.2.0]
+  usecase/                Lightweight UseCase[D, R] + AsCommandHandler / AsQueryHandler [v0.2.0]
+eventsourcing/            EventStore, SnapshotStore, Projector
+eventbus/                 Publisher/Subscriber (watermill contract), Outbox, Inbox
+  inbox/                  Default in-memory Inbox implementation [v0.2.0]
+ports/                    Infra interfaces (logger, cache, database, storage, httpclient, observability)
+transport/                Server contracts (http, grpc, graphql) — no library deps
+  grpc/                   + interceptor combinators + errorsx → grpc Status mapping [v0.2.0]
+  graphql/                + Loader contract, Relay cursor codec, FilterInput → Specification [v0.2.0]
+config/                   Config Provider (viper-backed), shared schema
+bootstrap/                App container, Module, AdapterRegistry, lifecycle
+pkg/
+  contextx                Standard context keys
+  errorsx                 Coded Error + WithDetail
+    httpx/                errorsx.Code → HTTP status + JSON writer + RuleViolation bridge [v0.2.0]
+  idgen                   Generator contract (UUIDv4 / UUIDv7)
+  pagination              Limit / Cursor / Page[T] for paged queries [v0.2.0]
+  vo/uuid                 UUID value object (v7, JSON-friendly) [v0.2.0]
+examples/                 Minimal runnable example
+docs/
+  grpc.md                 gRPC integration guide [v0.2.0]
+  graphql.md              GraphQL integration guide [v0.2.0]
 ```
 
 ## Requirements
@@ -40,3 +57,58 @@ examples/        Minimal runnable example
 - `github.com/google/uuid` — ID utilities
 
 No infra client libraries are imported by the core.
+
+## Why no CRUD-style Store in core?
+
+`go-ddd-core` defines `domain.Repository[T, ID]` for **aggregate persistence**
+(`FindByID` / `Save` / `Delete`). It deliberately does *not* ship a generic
+CRUD store (`List` / `Search` / `Patch` / `Update`).
+
+Aggregate repositories enforce a consistency boundary — every load and save
+moves a complete aggregate through its invariants. Generic CRUD stores serve
+read models, projections, and table mappers; their right shape (filter syntax,
+patch semantics, soft-delete behaviour, audit columns) varies per project. A
+core-imposed `Store[T, ID]` would either be too narrow (missing your projection's
+needs) or too wide (forcing every adapter to implement methods it does not
+need).
+
+### Building a Store in `go-ddd-adapters`
+
+If your service needs a CRUD store, build it in `go-ddd-adapters` (or a
+service-local package) reusing core types instead of inventing parallel ones:
+
+| Need                  | Reuse from core                                    |
+|-----------------------|----------------------------------------------------|
+| Paging arguments      | `pkg/pagination.Limit` / `pkg/pagination.Cursor`  |
+| Paging result         | `pkg/pagination.Page[T]`                           |
+| Typed query filter    | `application/query/spec.Specification[T]`          |
+| SQL translation hook  | `application/query/spec.SQLTranslatable`           |
+| Coded errors          | `pkg/errorsx.Error` + `pkg/errorsx/httpx`         |
+
+A typical adapter signature looks like:
+
+```go
+type Store[T any, ID comparable] interface {
+    Get(ctx context.Context, id ID) (T, error)
+    List(ctx context.Context, req pagination.PageRequest) (pagination.Page[T], error)
+    Search(ctx context.Context, s spec.Specification[T], req pagination.PageRequest) (pagination.Page[T], error)
+    Create(ctx context.Context, value T) error
+    Update(ctx context.Context, value T) error
+    Delete(ctx context.Context, id ID) error
+}
+```
+
+**Anti-patterns to avoid in your Store:**
+
+- `Patch(ctx, id, map[string]any)` — loses type safety; prefer typed
+  partial-update structs (REST: PATCH body schema, GraphQL: input type).
+- `Search(ctx, map[string]any)` — fight the typing system. Use a
+  Specification tree built via `application/query/spec` so SQL translation
+  can opt in via the side-interface.
+
+### GraphQL services
+
+The GraphQL helpers in `transport/graphql` (Relay Connection cursor codec,
+`FilterInput` → `Specification` walker) are designed to plug into the same
+`pagination` and `spec` types. See [`docs/graphql.md`](docs/graphql.md) for
+the full integration guide.

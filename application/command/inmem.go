@@ -29,10 +29,11 @@ func (b *InMemoryBus) RegisterHandler(name string, fn DispatchFunc) {
 	b.handlers[name] = Apply(fn, b.middlewares...)
 }
 
-// Dispatch looks up the handler for cmd and invokes it.
+// Dispatch looks up the handler for cmd and invokes it. The routing name is
+// resolved via NameOf, which prefers an explicit CommandName() method.
 func (b *InMemoryBus) Dispatch(ctx context.Context, cmd Command) (any, error) {
 	b.mu.RLock()
-	fn, ok := b.handlers[cmd.CommandName()]
+	fn, ok := b.handlers[NameOf(cmd)]
 	b.mu.RUnlock()
 	if !ok {
 		return nil, ErrHandlerNotFound

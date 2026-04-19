@@ -1,0 +1,47 @@
+package query_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/slam0504/go-ddd-core/application/query"
+)
+
+type implicitQ struct{ K string }
+
+type implicitHandler struct{}
+
+func (implicitHandler) Handle(_ context.Context, q implicitQ) (string, error) {
+	return "implicit:" + q.K, nil
+}
+
+func TestNameOf_FallsBackToTypeName(t *testing.T) {
+	if got := query.NameOf(implicitQ{}); got != "implicitQ" {
+		t.Fatalf("got %q, want implicitQ", got)
+	}
+}
+
+func TestNameOf_PrefersExplicitMethod(t *testing.T) {
+	if got := query.NameOf(lookup{}); got != "lookup" {
+		t.Fatalf("got %q, want lookup", got)
+	}
+}
+
+func TestNameOf_NilIsEmpty(t *testing.T) {
+	if got := query.NameOf(nil); got != "" {
+		t.Fatalf("got %q, want empty", got)
+	}
+}
+
+func TestRegister_TypeOnlyQueryIsRouted(t *testing.T) {
+	bus := query.NewInMemoryBus()
+	query.Register[implicitQ, string](bus, implicitHandler{})
+
+	res, err := bus.Dispatch(context.Background(), implicitQ{K: "x"})
+	if err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	if got, _ := res.(string); got != "implicit:x" {
+		t.Fatalf("got %v, want implicit:x", res)
+	}
+}

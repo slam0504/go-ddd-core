@@ -7,6 +7,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-18
+
+Production-ready augmentation. v0.2.0 fills the "last mile" for CRUD-heavy
+services without compromising the zero-opinion contract framework stance: it
+adds shared types every adapter would otherwise re-derive (pagination,
+specification, value objects, HTTP error mapping) plus contract helpers for
+gRPC and GraphQL transports. The core's third-party dependency surface is
+unchanged.
+
+### Added
+
+#### Pagination (`pkg/pagination/`) — new
+- `PageRequest` sealed interface with `Limit{Size, Offset}` and
+  `Cursor{Token, Size}` variants so callers must pick a paging style
+  explicitly rather than mixing offset and cursor accidentally.
+- `Page[T]{Items, Total, NextCursor}` envelope with `HasNext()`. Total of
+  `-1` is the sentinel for "cursor mode, count not computed".
+
+#### Specification (`application/query/spec/`) — new
+- `Specification[T]` interface with `IsSatisfiedBy / And / Or / Not`.
+- `Predicate[T](func)` adapter for ad-hoc rules, plus standalone `And` /
+  `Or` / `Not` functions for tree assembly.
+- `SQLTranslatable` opt-in side-interface so adapter-defined leaves can
+  expose a `(clause, args)` pair without forcing every spec to know SQL.
+- `Composite[T]` and `Negation[T]` interfaces let translators walk the
+  tree with a single type switch instead of one per combinator.
+
+#### UseCase (`application/usecase/`) — new
+- `UseCase[D, R]` interface for module-internal application services that
+  do not need bus dispatching.
+- `Func[D, R]` plain-function adapter (mirrors `http.HandlerFunc`).
+- `AsCommandHandler` / `AsQueryHandler` upgrade adapters so a use case can
+  later be promoted onto the command / query Bus without rewriting the
+  implementation.
+
+#### Inbox default implementation (`eventbus/inbox/`) — new
+- `Memory` — goroutine-safe in-memory `eventbus.Inbox` for tests,
+  examples, and single-instance services. Optional `WithMaxSize` evicts
+  the oldest half on overflow; `WithClock` allows deterministic tests.
+
+#### Value object helpers (`domain/`, `pkg/vo/uuid/`)
+- `domain.EqualValues[T comparable]` and `domain.DeepEqualValues[T any]`
+  helpers for `ValueObject.Equal` implementations (replaces the bare
+  `ValueObject` interface with practical building blocks).
+- `pkg/vo/uuid.UUID` — UUID v7 value object with `New` / `Parse` /
+  `MustParse` / `String` / `IsNil` / `Equal`, implementing
+  `domain.ValueObject` and `encoding.TextMarshaler` /
+  `encoding.TextUnmarshaler` so it round-trips through JSON. Storage
+  encoding (BINARY(16) / BYTEA) intentionally lives in adapters.
+
+#### errorsx HTTP bridge (`pkg/errorsx/httpx/`) — new
+- `StatusFromCode(errorsx.Code) int` mapping table covering all 10
+  built-in codes; unknown codes fall back to 500.
+- `WriteJSON(w, err)` writes a standard `{code, message, details}` body
+  with the correct status header.
+- `Translate(err)` exposes the mapping logic for non-`net/http`
+  transports (echo, gin, fiber).
+- `FromRuleViolation(rv)` lifts a `domain.RuleViolation` into a coded
+  `*errorsx.Error` with the rule code preserved as a `rule` detail.
+
+#### transport/grpc helpers
+- `CombineInterceptorProviders(...)` flattens unary and stream
+  interceptors from multiple providers in declaration order.
+- `CollectServiceProviders(...)` deduplicates nil providers.
+- `Status*` constants mirror `google.golang.org/grpc/codes` numerically
+  (so adapters cast directly) without importing the gRPC library.
+- `CodeFromErrorsx(errorsx.Code) uint32` translates the 10 built-in
+  errorsx codes to gRPC status codes.
+
+#### transport/graphql helpers
+- `Loader[K, V]` interface for batched / deduped resolver lookups,
+  agnostic to the concrete dataloader library.
+- `EncodeCursor` / `DecodeCursor` versioned (`v1:`) opaque cursor codec.
+- `ConnectionArgs` + `ToPageRequest` translate Relay `first/after` into
+  `pagination.Cursor` (backward `last/before` returns
+  `ErrUnsupportedDirection` so resolvers reject explicitly).
+- `Connection[T]` + `BuildConnection` assemble a Relay Connection from a
+  `pagination.Page[T]` and a per-item cursor extractor.
+- `FilterInput` + `BuildSpecification[T]` recursively translate a
+  GraphQL filter input tree into a composed `spec.Specification[T]`,
+  routing leaves through a user-supplied `LeafBuilder`.
+
+#### Documentation
+- New `docs/graphql.md` integration guide covering pagination, filter,
+  loader, and error wiring.
+- New `docs/grpc.md` integration guide covering adapter assembly,
+  errorsx → gRPC code mapping, and bootstrap wiring.
+- `README.md` adds a "Why no CRUD-style Store in core?" section with
+  reuse table and recommended `Store[T, ID]` shape for adapters.
+
+### Changed (BREAKING)
+
+- `application/command.Command` is now a marker interface
+  (`interface{}`); the previously required `CommandName() string` method
+  is **optional**. Routing names are resolved via `command.NameOf`, which
+  prefers an explicitly declared `CommandName()` and falls back to the Go
+  type name. The same change applies to `application/query.Query` /
+  `query.NameOf`.
+- `command.InMemoryBus.Dispatch` and `query.InMemoryBus.Dispatch` now
+  call `NameOf` instead of `cmd.CommandName()` directly.
+- `command.Register[C, R]` and `query.Register[Q, R]` derive the
+  registration name from the type parameter via reflection rather than
+  the value-side `CommandName()` call (still preferring the explicit
+  method when present and safe).
+
+### Migration
+
+Existing services that **declared `CommandName()` / `QueryName()` on
+their commands and queries** require **no changes** — the explicit method
+remains preferred at runtime and over reflection.
+
+Code that **directly invoked `cmd.CommandName()`** on a value typed as
+the `Command` interface will fail to compile. Replace such calls with
+`command.NameOf(cmd)` (and `query.NameOf(q)` for queries):
+
+```go
+// Before
+name := cmd.CommandName()
+
+// After
+name := command.NameOf(cmd)
+```
+
+Cross-service contracts (Kafka topics, RPC method keys) should continue
+to declare `CommandName()` explicitly so renaming the Go type does not
+silently move the routing key on the wire.
+
+[Unreleased]: https://github.com/slam0504/go-ddd-core/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/slam0504/go-ddd-core/releases/tag/v0.2.0
+
 ## [0.1.0] - 2026-04-18
 
 Initial public release. The core defines interfaces and primitives only —
@@ -107,5 +237,4 @@ them via config.
 ### Requirements
 - Go 1.24+
 
-[Unreleased]: https://github.com/slam0504/go-ddd-core/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/slam0504/go-ddd-core/releases/tag/v0.1.0

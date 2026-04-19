@@ -27,7 +27,7 @@ func (b *InMemoryBus) RegisterHandler(name string, fn DispatchFunc) {
 
 func (b *InMemoryBus) Dispatch(ctx context.Context, q Query) (any, error) {
 	b.mu.RLock()
-	fn, ok := b.handlers[q.QueryName()]
+	fn, ok := b.handlers[NameOf(q)]
 	b.mu.RUnlock()
 	if !ok {
 		return nil, ErrHandlerNotFound

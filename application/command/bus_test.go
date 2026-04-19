@@ -46,7 +46,7 @@ func TestInMemoryBus_MiddlewareWrapsHandler(t *testing.T) {
 	var calls []string
 	mw := func(next command.DispatchFunc) command.DispatchFunc {
 		return func(ctx context.Context, c command.Command) (any, error) {
-			calls = append(calls, "before:"+c.CommandName())
+			calls = append(calls, "before:"+command.NameOf(c))
 			res, err := next(ctx, c)
 			calls = append(calls, "after")
 			return res, err
