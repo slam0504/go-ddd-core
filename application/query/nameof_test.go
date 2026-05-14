@@ -45,3 +45,29 @@ func TestRegister_TypeOnlyQueryIsRouted(t *testing.T) {
 		t.Fatalf("got %v, want implicit:x", res)
 	}
 }
+
+type pointerExplicitQ struct{ Tag string }
+
+func (*pointerExplicitQ) QueryName() string { return "pointer.explicit.q" }
+
+type pointerExplicitQHandler struct{}
+
+func (pointerExplicitQHandler) Handle(_ context.Context, q *pointerExplicitQ) (string, error) {
+	return "got:" + q.Tag, nil
+}
+
+// Guards Register/Dispatch name-resolution symmetry for pointer query types
+// whose QueryName() is declared on a pointer receiver. See the matching
+// command-side test for the underlying invariant.
+func TestRegister_PointerQueryWithExplicitNameIsRouted(t *testing.T) {
+	bus := query.NewInMemoryBus()
+	query.Register[*pointerExplicitQ, string](bus, pointerExplicitQHandler{})
+
+	res, err := bus.Dispatch(context.Background(), &pointerExplicitQ{Tag: "ok"})
+	if err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	if got, _ := res.(string); got != "got:ok" {
+		t.Fatalf("got %v, want got:ok", res)
+	}
+}

@@ -70,3 +70,26 @@ func TestRegister_TypeOnlyHandlerIsRouted(t *testing.T) {
 		t.Fatalf("got %v, want 40", res)
 	}
 }
+
+type pointerExplicitHandler struct{}
+
+func (pointerExplicitHandler) Handle(_ context.Context, c *pointerExplicit) (int, error) {
+	return c.Z + 1, nil
+}
+
+// Guards against an asymmetry where Register-side name resolution skips the
+// CommandName() probe for pointer type parameters while Dispatch-side NameOf
+// honours pointer-receiver CommandName(). The two must agree or the handler
+// becomes unreachable.
+func TestRegister_PointerCommandWithExplicitNameIsRouted(t *testing.T) {
+	bus := command.NewInMemoryBus()
+	command.Register[*pointerExplicit, int](bus, pointerExplicitHandler{})
+
+	res, err := bus.Dispatch(context.Background(), &pointerExplicit{Z: 41})
+	if err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	if got, _ := res.(int); got != 42 {
+		t.Fatalf("got %v, want 42", res)
+	}
+}

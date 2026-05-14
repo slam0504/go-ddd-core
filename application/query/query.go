@@ -69,19 +69,26 @@ func NameOf(q Query) string {
 	return t.Name()
 }
 
+// nameOfType resolves the routing name from the type parameter. For pointer
+// types it probes via a non-nil *T allocated by reflect.New so QueryName()
+// on pointer receivers is honoured without nil-deref. Symmetric with the
+// Dispatch-side NameOf, which receives a concrete value.
 func nameOfType[Q any]() string {
 	t := reflect.TypeOf((*Q)(nil)).Elem()
-	isPtr := t.Kind() == reflect.Ptr
+	var probe any
+	if t.Kind() == reflect.Ptr {
+		probe = reflect.New(t.Elem()).Interface()
+	} else {
+		var zero Q
+		probe = any(zero)
+	}
+	if n, ok := probe.(interface{ QueryName() string }); ok {
+		if s := n.QueryName(); s != "" {
+			return s
+		}
+	}
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
-	}
-	if !isPtr {
-		var zero Q
-		if n, ok := any(zero).(interface{ QueryName() string }); ok {
-			if s := n.QueryName(); s != "" {
-				return s
-			}
-		}
 	}
 	return t.Name()
 }

@@ -81,21 +81,27 @@ func NameOf(cmd Command) string {
 }
 
 // nameOfType resolves the routing name from the type parameter, used by
-// Register where no value is in hand. Pointer types skip the value-side
-// CommandName() probe to avoid nil-deref panics in receiver methods.
+// Register where no value is in hand. For pointer types it probes via a
+// non-nil *T allocated by reflect.New so CommandName() methods on pointer
+// receivers are honoured without risking nil-deref. This keeps Register-side
+// name resolution symmetric with the Dispatch-side NameOf, which receives a
+// concrete value.
 func nameOfType[C any]() string {
 	t := reflect.TypeOf((*C)(nil)).Elem()
-	isPtr := t.Kind() == reflect.Ptr
+	var probe any
+	if t.Kind() == reflect.Ptr {
+		probe = reflect.New(t.Elem()).Interface()
+	} else {
+		var zero C
+		probe = any(zero)
+	}
+	if n, ok := probe.(interface{ CommandName() string }); ok {
+		if s := n.CommandName(); s != "" {
+			return s
+		}
+	}
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
-	}
-	if !isPtr {
-		var zero C
-		if n, ok := any(zero).(interface{ CommandName() string }); ok {
-			if s := n.CommandName(); s != "" {
-				return s
-			}
-		}
 	}
 	return t.Name()
 }
