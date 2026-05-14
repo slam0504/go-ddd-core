@@ -16,13 +16,14 @@ import (
 	"github.com/slam0504/go-ddd-core/eventbus"
 )
 
-// Memory is a goroutine-safe in-memory Inbox. It records every seen event ID
-// in a map; suitable for tests, single-instance examples, and short-lived
-// processes. Not suitable for production multi-instance services because the
-// dedup window does not survive a restart and is not shared across replicas.
+// Memory is a goroutine-safe in-memory Inbox. It records every seen
+// (consumer, eventID) pair; suitable for tests, single-instance examples,
+// and short-lived processes. Not suitable for production multi-instance
+// services because the dedup window does not survive a restart and is not
+// shared across replicas.
 type Memory struct {
 	mu      sync.RWMutex
-	seenAt  map[string]time.Time
+	seenAt  map[eventbus.InboxKey]time.Time
 	now     func() time.Time
 	maxSize int
 }
@@ -46,7 +47,7 @@ func WithMaxSize(limit int) MemoryOption {
 // NewMemory constructs an in-memory inbox.
 func NewMemory(opts ...MemoryOption) *Memory {
 	m := &Memory{
-		seenAt: make(map[string]time.Time),
+		seenAt: make(map[eventbus.InboxKey]time.Time),
 		now:    time.Now,
 	}
 	for _, opt := range opts {
@@ -55,32 +56,32 @@ func NewMemory(opts ...MemoryOption) *Memory {
 	return m
 }
 
-// Seen reports whether the given event ID has been recorded.
-func (m *Memory) Seen(_ context.Context, eventID string) (bool, error) {
+// Seen reports whether key has been recorded.
+func (m *Memory) Seen(_ context.Context, key eventbus.InboxKey) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	_, ok := m.seenAt[eventID]
+	_, ok := m.seenAt[key]
 	return ok, nil
 }
 
-// Record marks the event ID as processed. Calling Record on an already-seen
-// ID is a no-op (the original timestamp is preserved) so handlers may safely
-// retry without skewing the eviction order.
-func (m *Memory) Record(_ context.Context, eventID string) error {
+// Record marks key as processed. Calling Record on an already-seen key is a
+// no-op (the original timestamp is preserved) so handlers may safely retry
+// without skewing the eviction order.
+func (m *Memory) Record(_ context.Context, key eventbus.InboxKey) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.seenAt[eventID]; ok {
+	if _, ok := m.seenAt[key]; ok {
 		return nil
 	}
-	m.seenAt[eventID] = m.now()
+	m.seenAt[key] = m.now()
 	if m.maxSize > 0 && len(m.seenAt) > m.maxSize {
 		m.evictOldestHalf()
 	}
 	return nil
 }
 
-// Size returns the current number of recorded event IDs. Exported primarily
-// for tests and operational metrics.
+// Size returns the current number of recorded keys. Exported primarily for
+// tests and operational metrics.
 func (m *Memory) Size() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -92,7 +93,7 @@ func (m *Memory) Size() int {
 // Seen/Record traffic.
 func (m *Memory) evictOldestHalf() {
 	type kv struct {
-		key string
+		key eventbus.InboxKey
 		at  time.Time
 	}
 	all := make([]kv, 0, len(m.seenAt))

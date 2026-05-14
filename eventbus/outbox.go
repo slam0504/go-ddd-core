@@ -9,8 +9,17 @@ import (
 
 // OutboxRecord is a serialised DomainEvent staged for reliable delivery.
 // Concrete outbox storage (SQL table, KV store, etc.) is an adapter concern.
+//
+// ID and EventID are distinct on purpose. ID identifies the outbox row,
+// chosen by the OutboxStore — typically a database sequence or UUID — so
+// retries and ack bookkeeping address a specific staging entry. EventID is
+// the domain event's identity carried by DomainEvent.EventID(); brokers use
+// it as message-id / idempotency key and downstream Inboxes use it for
+// dedup. Fan-out to multiple topics produces multiple rows with distinct
+// IDs but a shared EventID.
 type OutboxRecord struct {
 	ID            string
+	EventID       string
 	Topic         string
 	EventName     string
 	AggregateID   string

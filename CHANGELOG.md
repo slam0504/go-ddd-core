@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING)
+
+- `eventbus.Inbox` is now scoped to `(consumer, eventID)` via a new
+  `eventbus.InboxKey{Consumer, EventID}` value type. `Seen` and `Record`
+  take an `InboxKey` instead of a bare `eventID string`. Per-consumer
+  scoping prevents one consumer's recording from silently suppressing
+  another consumer's handler — a real risk when the same event reaches a
+  projector, a reactor, and a saga.
+  - Update call sites to `inbox.Seen(ctx, eventbus.InboxKey{Consumer: name, EventID: id})`.
+  - `eventbus/inbox.Memory` updated in lockstep.
+- `eventbus.OutboxRecord` gains an `EventID` field, distinct from `ID`.
+  `ID` identifies the outbox row (assigned by the OutboxStore); `EventID`
+  carries `DomainEvent.EventID()` for broker message-id and downstream
+  inbox dedup. Fan-out to multiple topics produces multiple rows sharing
+  one `EventID`.
+
+### Added
+
+- `application.UnitOfWorkFromTxManager(tm)` bridges a `ports/database.TxManager`
+  into an `application.UnitOfWork`, so use cases can depend on the application
+  contract while adapters supply the SQL transaction. The bridge is a thin
+  passthrough; driver-specific tx-handle propagation (ctx values, `*sql.Tx`,
+  etc.) remains the TxManager's responsibility.
+
+### Fixed
+
+- `command.Register[*T, R]` / `query.Register[*T, R]` now honour
+  `CommandName()` / `QueryName()` declared on pointer receivers. Previously
+  `nameOfType` skipped the method probe for pointer type parameters to
+  avoid nil-deref, leaving the handler registered under the Go type name
+  while `Dispatch(&T{})` looked it up under the explicit method-returned
+  name. The probe now uses `reflect.New(t.Elem()).Interface()` for a
+  non-nil zero-value `*T`, so Register and Dispatch resolve identically
+  for both value and pointer type parameters.
+
 ## [0.2.1] - 2026-04-19
 
 Documentation-only release that complements v0.2.0. Where v0.2.0 added the

@@ -5,12 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/slam0504/go-ddd-core/eventbus"
 	"github.com/slam0504/go-ddd-core/eventbus/inbox"
 )
 
+func key(consumer, eventID string) eventbus.InboxKey {
+	return eventbus.InboxKey{Consumer: consumer, EventID: eventID}
+}
+
 func TestSeen_FalseBeforeRecord(t *testing.T) {
 	in := inbox.NewMemory()
-	seen, err := in.Seen(context.Background(), "evt-1")
+	seen, err := in.Seen(context.Background(), key("c1", "evt-1"))
 	if err != nil {
 		t.Fatalf("Seen: %v", err)
 	}
@@ -21,10 +26,10 @@ func TestSeen_FalseBeforeRecord(t *testing.T) {
 
 func TestRecord_ThenSeenIsTrue(t *testing.T) {
 	in := inbox.NewMemory()
-	if err := in.Record(context.Background(), "evt-1"); err != nil {
+	if err := in.Record(context.Background(), key("c1", "evt-1")); err != nil {
 		t.Fatalf("Record: %v", err)
 	}
-	seen, _ := in.Seen(context.Background(), "evt-1")
+	seen, _ := in.Seen(context.Background(), key("c1", "evt-1"))
 	if !seen {
 		t.Fatalf("Seen should be true after Record")
 	}
@@ -33,12 +38,37 @@ func TestRecord_ThenSeenIsTrue(t *testing.T) {
 func TestRecord_IsIdempotent(t *testing.T) {
 	in := inbox.NewMemory()
 	for i := 0; i < 5; i++ {
-		if err := in.Record(context.Background(), "evt-1"); err != nil {
+		if err := in.Record(context.Background(), key("c1", "evt-1")); err != nil {
 			t.Fatalf("Record #%d: %v", i, err)
 		}
 	}
 	if got := in.Size(); got != 1 {
 		t.Fatalf("Size = %d, want 1", got)
+	}
+}
+
+// TestConsumerScopeIsolation guards the core invariant of the scoped Inbox
+// design: two consumers seeing the same event id must not share state. If
+// they did, one consumer's Record would let another consumer skip the
+// handler — silent message loss.
+func TestConsumerScopeIsolation(t *testing.T) {
+	in := inbox.NewMemory()
+	ctx := context.Background()
+
+	if err := in.Record(ctx, key("projector", "evt-1")); err != nil {
+		t.Fatalf("Record projector: %v", err)
+	}
+
+	seen, _ := in.Seen(ctx, key("reactor", "evt-1"))
+	if seen {
+		t.Fatalf("reactor must not see evt-1 already recorded by projector")
+	}
+
+	if err := in.Record(ctx, key("reactor", "evt-1")); err != nil {
+		t.Fatalf("Record reactor: %v", err)
+	}
+	if got := in.Size(); got != 2 {
+		t.Fatalf("Size = %d, want 2 (one per consumer)", got)
 	}
 }
 
@@ -51,7 +81,7 @@ func TestEviction_TriggersOnceMaxSizeExceeded(t *testing.T) {
 	in := inbox.NewMemory(inbox.WithMaxSize(4), inbox.WithClock(clock))
 
 	for i, id := range []string{"a", "b", "c", "d", "e"} {
-		if err := in.Record(context.Background(), id); err != nil {
+		if err := in.Record(context.Background(), key("c1", id)); err != nil {
 			t.Fatalf("Record #%d: %v", i, err)
 		}
 	}
@@ -61,12 +91,12 @@ func TestEviction_TriggersOnceMaxSizeExceeded(t *testing.T) {
 	}
 	// "a" and "b" are oldest and should be gone; "c", "d", "e" remain.
 	for _, id := range []string{"a", "b"} {
-		if seen, _ := in.Seen(context.Background(), id); seen {
+		if seen, _ := in.Seen(context.Background(), key("c1", id)); seen {
 			t.Fatalf("expected %q evicted", id)
 		}
 	}
 	for _, id := range []string{"c", "d", "e"} {
-		if seen, _ := in.Seen(context.Background(), id); !seen {
+		if seen, _ := in.Seen(context.Background(), key("c1", id)); !seen {
 			t.Fatalf("expected %q retained", id)
 		}
 	}
@@ -75,7 +105,7 @@ func TestEviction_TriggersOnceMaxSizeExceeded(t *testing.T) {
 func TestUnboundedByDefault(t *testing.T) {
 	in := inbox.NewMemory()
 	for i := 0; i < 1000; i++ {
-		_ = in.Record(context.Background(), idString(i))
+		_ = in.Record(context.Background(), key("c1", idString(i)))
 	}
 	if got := in.Size(); got != 1000 {
 		t.Fatalf("default should not evict, got Size=%d", got)
