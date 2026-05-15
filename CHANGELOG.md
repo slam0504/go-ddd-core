@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-15
+
+Contract alignment release. Two breaking changes tighten the boundary
+between domain transactions and consumer-side idempotency:
+
+- Use cases now depend on `application.UnitOfWork` exclusively. The new
+  `application.UnitOfWorkFromTxManager(tm)` bridge turns any
+  `ports/database.TxManager` into a `UnitOfWork`, so adapters keep the
+  driver-specific transaction handle while use cases only see the
+  application contract. Direct `TxManager.WithinTx` calls at the use
+  case layer become an anti-pattern (see `docs/anti-patterns.md`).
+- `eventbus.Inbox` is now scoped per-consumer via `InboxKey{Consumer,
+  EventID}`. A single domain event can now reach a projector, a reactor,
+  and a saga without one consumer's recorded "seen" silently
+  short-circuiting another consumer's handler. `OutboxRecord` gains a
+  dedicated `EventID` field distinct from the storage row `ID`, so
+  fan-out to multiple topics keeps a stable cross-topic event identity
+  while each row stays addressable by its own primary key.
+
+See [`docs/anti-patterns.md`](docs/anti-patterns.md) "Design boundaries:
+what core deliberately omits" for the rationale on which contracts ship
+implementations and which do not.
+
 ### Changed (BREAKING)
 
 - `eventbus.Inbox` is now scoped to `(consumer, eventID)` via a new
@@ -41,6 +64,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name. The probe now uses `reflect.New(t.Elem()).Interface()` for a
   non-nil zero-value `*T`, so Register and Dispatch resolve identically
   for both value and pointer type parameters.
+
+### Deprecated
+
+- `eventbus/inbox/memory.go` (the in-memory `Memory` Inbox) is preserved
+  for backward compatibility in v0.3.0 and **is slated to move to
+  `go-ddd-adapters` in v0.4.0**. Services that import it directly should
+  plan to migrate once the adapter package lands. Rationale: the v0.2.x
+  in-memory inbox predates the infrastructure-client-free boundary, and
+  v0.3.0 tightens core to ship only interfaces plus in-process defaults
+  for CQRS buses and config. See `docs/anti-patterns.md` "Note on
+  `eventbus/inbox/memory.go`" for the long-form explanation.
+
+### Documentation
+
+- `docs/anti-patterns.md` Inbox / Outbox example aligned with the new
+  `InboxKey` API and the `UnitOfWork.Do` use-case pattern. The
+  documentation gains a new "Design boundaries: what core deliberately
+  omits" section covering why no default `eventbus.Relay`,
+  `eventsourcing.EventStore`, or `CheckpointStore` ship in core.
 
 ## [0.2.1] - 2026-04-19
 
@@ -205,7 +247,8 @@ Cross-service contracts (Kafka topics, RPC method keys) should continue
 to declare `CommandName()` explicitly so renaming the Go type does not
 silently move the routing key on the wire.
 
-[Unreleased]: https://github.com/slam0504/go-ddd-core/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/slam0504/go-ddd-core/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/slam0504/go-ddd-core/releases/tag/v0.3.0
 [0.2.0]: https://github.com/slam0504/go-ddd-core/releases/tag/v0.2.0
 
 ## [0.1.0] - 2026-04-18
