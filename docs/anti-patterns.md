@@ -255,20 +255,47 @@ if err := publisher.Publish(ctx, "orders", order.DomainEvents()...); err != nil 
   [`eventbus.Relay`](../eventbus/outbox.go) drains them to the broker.
 - Consumer side: [`eventbus/inbox.Memory`](../eventbus/inbox/memory.go) (or
   an SQL adapter from `go-ddd-adapters`) deduplicates redelivered messages
-  via `Seen` / `Record` around handler invocation.
+  via `Seen` / `Record` keyed by
+  [`eventbus.InboxKey{Consumer, EventID}`](../eventbus/inbox.go), so each
+  consumer (projector, reactor, saga) records its own progress independently.
 
 ```go
 // ✅ Use this (producer)
-err := txm.Within(ctx, func(ctx context.Context) error {
+if err := uow.Do(ctx, func(ctx context.Context) error {
     if err := repo.Save(ctx, order); err != nil { return err }
     return outbox.Stage(ctx, "orders", order.DomainEvents()...)
-})
+}); err != nil {
+    return err
+}
+```
 
+```go
 // ✅ Use this (consumer)
-seen, _ := inbox.Seen(ctx, env.Event.EventID())
-if seen { env.Ack(); return nil }
-if err := handler(ctx, env.Event); err != nil { env.Nack(); return err }
-_ = inbox.Record(ctx, env.Event.EventID())
+//
+// At-least-once requires idempotent handlers. The Inbox interface
+// (eventbus/inbox.go) is best-effort dedup: Record only returns error,
+// not "was duplicate", and Memory.Record silently no-ops on duplicate.
+// Two workers can both pass Seen and both run the handler before
+// either Records, so handler side effects must tolerate replay —
+// for example by writing read models with upsert semantics, or by
+// guarding side effects with the event id.
+key := eventbus.InboxKey{Consumer: "orders-projector", EventID: env.Event.EventID()}
+seen, err := inbox.Seen(ctx, key)
+if err != nil {
+    env.Nack()
+    return err
+}
+if seen {
+    env.Ack()
+    return nil
+}
+if err := uow.Do(ctx, func(ctx context.Context) error {
+    if err := handler(ctx, env.Event); err != nil { return err }
+    return inbox.Record(ctx, key)
+}); err != nil {
+    env.Nack()
+    return err
+}
 env.Ack()
 ```
 
@@ -329,6 +356,68 @@ func fromDomain(o order.Order) model { ... }
 
 The adapter owns the storage shape; the domain owns the rules. Each side
 can change without dragging the other.
+
+---
+
+## Design boundaries: what core deliberately omits
+
+Some patterns above point at a substitute API in core (`InboxKey`,
+`Specification`, `BaseAggregate`...). Others rely on a contract that
+core exposes only as an interface, with no default implementation. The
+gap is intentional, not unfinished work. `go-ddd-core` is
+infrastructure-client-free: it ships interfaces plus a handful of
+in-process defaults (the CQRS in-memory buses, the viper-backed config
+provider, the in-memory inbox), but deliberately omits any code that
+talks to a network broker, database driver, or HTTP framework. Concrete
+bridging logic that needs those clients belongs in `go-ddd-adapters` or
+a service repository.
+
+### Why no default `eventbus.Relay`
+
+`eventbus.Relay` is declared as an interface in `eventbus/outbox.go`,
+with no implementation in core. A working Relay must:
+
+1. Poll an `OutboxStore` for due records (`Fetch`),
+2. Translate each `OutboxRecord` (with `Payload []byte` + headers) back
+   into a publishable form,
+3. Call a `Publisher` (which takes a decoded `domain.DomainEvent`) or a
+   broker-native sender,
+4. Acknowledge success or failure (`MarkSent` / `MarkFailed`).
+
+Step 2 is the deliberate gap. The `OutboxRecord → DomainEvent` (or
+`OutboxRecord → *message.Message`) translation depends on the adapter's
+chosen codec, header conventions, and broker semantics. Pinning a
+single contract here would force every adapter to adopt those choices,
+which contradicts core's "pick concrete adapters and wire them via
+config" stance.
+
+Adapter authors should:
+
+- Either pair the Relay with the same `Codec` used by their `Publisher`
+  (decode `Payload` back to `DomainEvent`, then call `Publisher.Publish`),
+- Or publish the raw bytes directly through a broker-specific sender,
+  bypassing core's `Publisher` interface for the Relay's hot path.
+
+### Why no default `eventsourcing.EventStore` / `CheckpointStore`
+
+`eventsourcing.EventStore` and `eventsourcing.CheckpointStore` are
+defined only as interfaces in core; no default implementation ships.
+Even an "in-memory" implementation must take a stance on optimistic
+concurrency, snapshot interaction, and projection checkpointing — all
+of which vary per service. Production-grade implementations belong in
+`go-ddd-adapters` or service repositories.
+
+For tests, write a minimal in-memory store inside the test package
+itself, or import a test utility from `go-ddd-adapters`. Do not depend
+on a "core in-memory EventStore" that has never existed.
+
+### Note on `eventbus/inbox/memory.go`
+
+`Memory` is a historical exception: an in-memory Inbox shipped with
+v0.2.0 before the infrastructure-client-free boundary was made
+explicit. It is preserved for backward compatibility in v0.3.0 and
+**slated to move to `go-ddd-adapters` in v0.4.0**. New adapter-level
+test utilities should not depend on it as a long-term API.
 
 ---
 
