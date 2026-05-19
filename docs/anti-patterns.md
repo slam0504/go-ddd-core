@@ -253,11 +253,15 @@ if err := publisher.Publish(ctx, "orders", order.DomainEvents()...); err != nil 
 - Producer side: [`eventbus.Outbox`](../eventbus/outbox.go) stages events in
   the same transaction as the aggregate save; an
   [`eventbus.Relay`](../eventbus/outbox.go) drains them to the broker.
-- Consumer side: [`eventbus/inbox.Memory`](../eventbus/inbox/memory.go) (or
-  an SQL adapter from `go-ddd-adapters`) deduplicates redelivered messages
-  via `Seen` / `Record` keyed by
-  [`eventbus.InboxKey{Consumer, EventID}`](../eventbus/inbox.go), so each
-  consumer (projector, reactor, saga) records its own progress independently.
+- Consumer side: deduplicate redelivered messages via `Seen` / `Record`
+  keyed by [`eventbus.InboxKey{Consumer, EventID}`](../eventbus/inbox.go),
+  so each consumer (projector, reactor, saga) records its own progress
+  independently. The recommended `Memory` import is
+  [`go-ddd-adapters/eventbus/inbox`](https://github.com/slam0504/go-ddd-adapters/tree/main/eventbus/inbox)
+  (adds `WithTTL`, `WithMaxSize`, `WithClock`); the same type still lives
+  at [`go-ddd-core/eventbus/inbox`](../eventbus/inbox/memory.go) during the
+  v0.3.0 → v0.4.0 transition — see the
+  [Note](#note-on-eventbusinboxmemorygo) below.
 
 ```go
 // ✅ Use this (producer)
@@ -416,8 +420,35 @@ on a "core in-memory EventStore" that has never existed.
 `Memory` is a historical exception: an in-memory Inbox shipped with
 v0.2.0 before the infrastructure-client-free boundary was made
 explicit. It is preserved for backward compatibility in v0.3.0 and
-**slated to move to `go-ddd-adapters` in v0.4.0**. New adapter-level
-test utilities should not depend on it as a long-term API.
+**slated for physical removal in v0.4.0**.
+
+**Status as of `go-ddd-adapters v0.3.0` (2026-05-19):** the
+relocation target already exists. `go-ddd-adapters` ships
+`eventbus/inbox` with the same `Memory` type (plus added `WithTTL`
+and `WithClock` options). Downstream services can migrate today by
+changing the import path; call sites stay identical:
+
+```go
+// before
+import "github.com/slam0504/go-ddd-core/eventbus/inbox"
+
+// after
+import "github.com/slam0504/go-ddd-adapters/eventbus/inbox"
+// inbox.NewMemory(...) unchanged
+```
+
+Core retains its copy through one more adapters release cycle, per
+the explicit guarantee in `go-ddd-adapters v0.3.0` CHANGELOG. The
+v0.4.0 deletion in this repo is therefore gated on **both** (a)
+downstream services completing the import-path migration above and
+(b) `go-ddd-adapters` advancing past `v0.3.0` (closing the overlap
+window). Either gate alone is insufficient: deleting before the
+adapters tag advances would break the published "one more release
+cycle" promise, even if every known consumer had already migrated.
+
+New adapter-level test utilities should not depend on the core copy
+as a long-term API — point at `go-ddd-adapters/eventbus/inbox`
+directly.
 
 ---
 
