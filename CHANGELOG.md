@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-20
+
+Deprecation-cycle close. The single change in this release is the
+physical removal of the in-process `Memory` Inbox implementation
+from core, completing the deprecation that was pre-announced in
+v0.3.0's `### Deprecated` section. The relocation target has been
+available at `github.com/slam0504/go-ddd-adapters/eventbus/inbox`
+since `go-ddd-adapters v0.3.0` (2026-05-19), and the "one more
+release cycle" overlap window committed to in that release was
+honoured by `go-ddd-adapters v0.4.0` (2026-05-20). Both gating
+conditions for the removal are now formally satisfied; downstream
+consumer inventory is empty (recorded 2026-05-20).
+
+The public `eventbus.Inbox` interface and `eventbus.InboxKey` value
+type are **unchanged** — they live in `eventbus/inbox.go` under
+`package eventbus`, not under the removed `package inbox`.
+
+### Removed (BREAKING)
+
+- `eventbus/inbox/memory.go` and `eventbus/inbox/memory_test.go`
+  physically removed. The entire `eventbus/inbox/` sub-package is
+  gone; there is no `package inbox` in core anymore. The in-process
+  `Memory` Inbox now lives at
+  `github.com/slam0504/go-ddd-adapters/eventbus/inbox` (since
+  `go-ddd-adapters v0.3.0`, with added `WithTTL` / `WithClock`
+  options). Downstream services migrate by changing the import path;
+  call sites stay identical:
+
+  ```go
+  // before
+  import "github.com/slam0504/go-ddd-core/eventbus/inbox"
+
+  // after
+  import "github.com/slam0504/go-ddd-adapters/eventbus/inbox"
+  // inbox.NewMemory(...) unchanged
+  ```
+
+  The `eventbus.Inbox` interface and `eventbus.InboxKey` struct
+  remain in `eventbus/inbox.go` under `package eventbus` and require
+  no caller changes.
+
+### Documentation
+
+- `docs/anti-patterns.md` updated: the Inbox / Outbox anti-pattern
+  Substitute section now points at `go-ddd-adapters/eventbus/inbox`
+  unambiguously (no more transitional dual-path framing), and the
+  "Note on `eventbus/inbox/memory.go`" section is rewritten as a
+  historical note documenting the v0.2.0 → adapters journey for
+  future readers tracing the boundary decisions.
+
 ## [0.3.0] - 2026-05-15
 
 Contract alignment release. Two breaking changes tighten the boundary
