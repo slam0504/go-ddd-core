@@ -422,11 +422,13 @@ v0.2.0 before the infrastructure-client-free boundary was made
 explicit. It is preserved for backward compatibility in v0.3.0 and
 **slated for physical removal in v0.4.0**.
 
-**Status as of `go-ddd-adapters v0.3.0` (2026-05-19):** the
-relocation target already exists. `go-ddd-adapters` ships
-`eventbus/inbox` with the same `Memory` type (plus added `WithTTL`
-and `WithClock` options). Downstream services can migrate today by
-changing the import path; call sites stay identical:
+**Status as of `go-ddd-adapters v0.4.0` (2026-05-20):** the
+relocation target has been shipped and the overlap window is now
+closed. Both `v0.3.0` (which first relocated `Memory` to adapters
+with added `WithTTL` and `WithClock` options) and `v0.4.0` (pgx
+Outbox + pgx TxManager, Go 1.25) are tagged on `go-ddd-adapters`.
+Downstream services should migrate the import path; call sites stay
+identical:
 
 ```go
 // before
@@ -437,14 +439,13 @@ import "github.com/slam0504/go-ddd-adapters/eventbus/inbox"
 // inbox.NewMemory(...) unchanged
 ```
 
-Core retains its copy through one more adapters release cycle, per
-the explicit guarantee in `go-ddd-adapters v0.3.0` CHANGELOG. The
-v0.4.0 deletion in this repo is therefore gated on **both** (a)
+The deletion in this repo was originally gated on **both** (a)
 downstream services completing the import-path migration above and
-(b) `go-ddd-adapters` advancing past `v0.3.0` (closing the overlap
-window). Either gate alone is insufficient: deleting before the
-adapters tag advances would break the published "one more release
-cycle" promise, even if every known consumer had already migrated.
+(b) `go-ddd-adapters` advancing past `v0.3.0` so the published "one
+more release cycle" overlap guarantee was honoured. Condition (b)
+was satisfied when `go-ddd-adapters v0.4.0` was tagged on
+2026-05-20. **Only (a) remains** before the core copy can be
+physically removed.
 
 New adapter-level test utilities should not depend on the core copy
 as a long-term API — point at `go-ddd-adapters/eventbus/inbox`
