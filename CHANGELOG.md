@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `ports/health` package providing the shared probe shape
+  for liveness/readiness endpoints. Two surfaces:
+  - `health.Check` interface (`Name() string; Check(ctx context.Context) error`).
+    Implementations must be safe for concurrent use and respect ctx
+    cancellation. Returning nil signals healthy; a non-nil error
+    becomes the operator-facing failure reason.
+  - `health.NewCheck(name, fn)` convenience constructor for wrapping
+    a plain `func(ctx) error` (typically a driver's `Ping`) without
+    defining a new type.
+
+  The core deliberately ships only the probe shape: registries, HTTP
+  handlers, and aggregation policy live in the transport adapter
+  that exposes the probes (see `docs/roadmap.md` v0.5.0 cycle).
+
 ## [0.4.0] - 2026-05-20
 
 Deprecation-cycle close. The single change in this release is the

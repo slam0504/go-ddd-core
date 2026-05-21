@@ -1,10 +1,11 @@
 # go-ddd-core State
 
-Last verified: 2026-05-21 Asia/Taipei (post core v0.4.0 release shipped)
-Source: verified via `git log` on `main` @ `aadde89` (merge of PR #4),
-`git tag v0.4.0` push, `gh release view v0.4.0` confirming Latest
-marker, and local `gofmt -l .`, `go vet`, `go build`,
-`go test ./...` against the merged tip.
+Last verified: 2026-05-21 Asia/Taipei (v0.5.0 cycle open on branch `feat/ports-health`)
+Source: verified via `git log` on `main` @ `1bd0a8c` (merge of PR #5
+docs/roadmap), `git tag v0.4.0` push at `aadde89`, `gh release view
+v0.4.0` confirming Latest marker, and local `gofmt -l ports/health/`
+(clean), `go vet ./ports/health/...`, `go test ./ports/health/... -race`
+(4 tests PASS) against branch tip on `feat/ports-health`.
 
 ## v0.3.0 Release Cycle: CLOSED
 
@@ -16,18 +17,66 @@ marker, and local `gofmt -l .`, `go vet`, `go build`,
 
 ## Current Branch / Heads
 
-- core `main` head: `aadde89` `Merge pull request #4 from slam0504/release/v0.4.0-prep`
-- adapters `main` head: `d438c0a` (v0.4.0 cycle bookkeeping)
+- core `main` head: `1bd0a8c` `Merge pull request #5 from slam0504/docs/roadmap`
+- core working branch: `feat/ports-health` (v0.5.0 cycle, off `main`)
+- core latest tag: `v0.4.0` at `aadde89` (post-tag bookkeeping +
+  roadmap merge are ahead but deliberately not retagged)
+- adapters `main` head: `b9696f6` (PR #18: core dep bumped v0.3.0 → v0.4.0)
 - Merged feature branches deleted from origin and locally:
   - `release/v0.3.0-prep` (core)
   - `release/v0.3.0-bump` (adapters)
   - `release/v0.4.0-prep` (core, deleted 2026-05-21 post-tag)
+  - `docs/roadmap` (core, deleted 2026-05-21 post-merge)
 
 ## Worktree
 
 - `.bat-worktrees/fc48c152`
   is on `bat/worktree-fc48c152`, fast-forwarded to `d9c8e5c` (origin/main).
   Ready for the next work cycle.
+
+## v0.5.0 Release Cycle: OPEN
+
+Started 2026-05-21 on branch `feat/ports-health`. Cycle scope is
+documented in `docs/roadmap.md` "Planned cycles" → v0.5.0:
+
+- **core** (this branch): new `ports/health` package with the
+  `Check` interface + `NewCheck(name, fn)` helper. Registries
+  and HTTP handlers stay out of core.
+- **adapters** (separate cycle, separate repo): `transport/http/stdlib`
+  adapter with graceful shutdown + a `health` sub-package that
+  wires `/healthz` + `/readyz` against the core contract.
+
+Branch tip status:
+
+- `A ports/health/health.go` (Check interface + NewCheck helper + unexported checkFunc)
+- `A ports/health/health_test.go` (4 contract tests, including direct-implementation case)
+- `M CHANGELOG.md` `[Unreleased]` → `### Added` ports/health entry
+- `M README.md` Layout section: ports/ row updated to include health,
+  new health/ sub-row marked `[v0.5.0]`. Same commit removes the
+  stale `inbox/  Default in-memory Inbox implementation [v0.2.0]`
+  line that v0.4.0's PR #4 missed (the sub-package was deleted then
+  but the README sub-row remained).
+
+Verification on branch tip:
+
+- `gofmt -l ports/health/` clean
+- `go vet ./ports/health/...` clean
+- `go test ./ports/health/... -race` PASS (4 tests, 1.8s)
+
+Next steps on this branch:
+
+1. Full repo `gofmt -l .` + `go vet ./...` + `go build ./...` +
+   `go test ./...` pass before push.
+2. Open PR `feat/ports-health` → `main`.
+3. Wait for CI green (golangci-lint + build/test).
+4. Merge (merge commit), delete branch local + remote.
+5. Bookkeeping commit: update `.agent/state.md` to "v0.5.0 core
+   half: SHIPPED, waiting on adapters", update `docs/roadmap.md`
+   if any cycle decisions shifted during implementation.
+
+v0.5.0 does **not** require a tag yet — the cycle finishes only
+when the adapters-side `transport/http/stdlib` ships. Tag at the
+last piece of the cycle, not the first.
 
 ## v0.4.0 Release Cycle: CLOSED
 
