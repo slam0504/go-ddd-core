@@ -1,11 +1,10 @@
 # go-ddd-core State
 
-Last verified: 2026-05-20 Asia/Taipei (post core deletion commit on `release/v0.4.0-prep`)
-Source: verified via `git log`, `git tag`, cross-repo inspection of
-`go-ddd-adapters` `main` (HEAD `d438c0a`) + tags (`v0.4.0` at
-`bc9b041`) + `.agent/state.md`, the 2026-05-20 gating-status
-update recorded below, and local execution of `gofmt -l .`,
-`go vet`, `go build`, `go test ./...` against branch tip `ef0e535`.
+Last verified: 2026-05-21 Asia/Taipei (post core v0.4.0 release shipped)
+Source: verified via `git log` on `main` @ `aadde89` (merge of PR #4),
+`git tag v0.4.0` push, `gh release view v0.4.0` confirming Latest
+marker, and local `gofmt -l .`, `go vet`, `go build`,
+`go test ./...` against the merged tip.
 
 ## v0.3.0 Release Cycle: CLOSED
 
@@ -17,11 +16,12 @@ update recorded below, and local execution of `gofmt -l .`,
 
 ## Current Branch / Heads
 
-- core `main` head: `d9c8e5c`
-- adapters `main` head: `ab92ea3`
+- core `main` head: `aadde89` `Merge pull request #4 from slam0504/release/v0.4.0-prep`
+- adapters `main` head: `d438c0a` (v0.4.0 cycle bookkeeping)
 - Merged feature branches deleted from origin and locally:
   - `release/v0.3.0-prep` (core)
   - `release/v0.3.0-bump` (adapters)
+  - `release/v0.4.0-prep` (core, deleted 2026-05-21 post-tag)
 
 ## Worktree
 
@@ -29,22 +29,30 @@ update recorded below, and local execution of `gofmt -l .`,
   is on `bat/worktree-fc48c152`, fast-forwarded to `d9c8e5c` (origin/main).
   Ready for the next work cycle.
 
-## v0.4.0 Release Cycle: IN PROGRESS
+## v0.4.0 Release Cycle: CLOSED
 
-**Deletion executed locally 2026-05-20.** Branch
-`release/v0.4.0-prep` at commit `ef0e535` (off `main` at
-`d0fe9cd`) carries:
+Release shipped 2026-05-21. PR #4 (`release/v0.4.0-prep` →
+`main`) merged at `aadde89`; v0.4.0 annotated tag pushed
+(`aadde89`); GitHub Release published as **Latest** at
+https://github.com/slam0504/go-ddd-core/releases/tag/v0.4.0.
+Branch `release/v0.4.0-prep` deleted local + remote.
+
+Shipped scope:
 
 - `D eventbus/inbox/memory.go` (was 116 lines)
 - `D eventbus/inbox/memory_test.go` (was 129 lines)
-- `M CHANGELOG.md` — new `[0.4.0] - 2026-05-20` section with
+- `M CHANGELOG.md` — `[0.4.0] - 2026-05-20` section with
   `### Removed (BREAKING)` entry and migration snippet
 - `M docs/anti-patterns.md` — Substitute section now points at
-  adapters unambiguously; "Note on `eventbus/inbox/memory.go`"
-  renamed to "Historical note: the v0.4.0 `eventbus/inbox` removal"
-  and rewritten in past-tense
+  adapters unambiguously; previous "Note on
+  `eventbus/inbox/memory.go`" callout rewritten as past-tense
+  "Historical note: the v0.4.0 `eventbus/inbox` removal"
+- `A .agent/`, `A AGENTS.md`, `A CLAUDE.md` (in a separate
+  `chore(agent)` commit on `main` ahead of the release PR) —
+  agent protocol files brought into version control with
+  paths normalised to repo-relative
 
-Verification on the branch tip:
+Verification on `main` @ `aadde89`:
 
 - `gofmt -l .` clean
 - `go vet ./...` clean
@@ -53,37 +61,8 @@ Verification on the branch tip:
   contract tests — the `Inbox` interface in `eventbus/inbox.go`
   was never under the deleted sub-package)
 
-**Awaiting (all reversible until push, increasingly hard to reverse
-after each step):**
-
-1. `git push origin main` to publish the two docs sync commits
-   (`c942cd0`, `d0fe9cd`) on which this branch is based.
-2. `git push -u origin release/v0.4.0-prep` to publish the branch.
-3. Open release PR → `main`.
-4. Merge PR (after any final review).
-5. Cut annotated tag `v0.4.0` on the merge commit.
-6. Publish GitHub Release marked Latest.
-7. Branch cleanup (`release/v0.4.0-prep` local + remote).
-
-Steps 1–4 are conventionally reversible (revert merge, rewrite
-branch); steps 5–6 are not (tag deletion is technically possible
-but Go's module proxy caches the version permanently — once
-`v0.4.0` is on proxy.golang.org, downstream `go get` calls can
-fetch it forever).
-
-**Adapters-side status (verified 2026-05-20):** the relocation target
-has been shipped **and the overlap window is closed**.
-
-- `go-ddd-adapters v0.3.0` (annotated tag at `3ce2a23`, 2026-05-19)
-  first relocated `Memory` to `eventbus/inbox` with `WithTTL` +
-  `WithClock` options. CHANGELOG promised "Core retains its copy ...
-  for one more release cycle".
-- `go-ddd-adapters v0.4.0` (annotated tag at `bc9b041`, 2026-05-20)
-  shipped the pgx Outbox + pgx TxManager and bumped CI to Go 1.25.
-  PRs #14–#17 merged; cycle branches cleaned up; `main` HEAD
-  `d438c0a`. **This advance satisfies the "one more release cycle"
-  promise** — adapters has moved past v0.3.0, so removing the core
-  copy no longer breaks any published guarantee.
+The `v0.4.0` tag is on proxy.golang.org once `go get` fetches
+it. Treat it as a permanent published version.
 
 Call sites stay identical — only the import path changes:
 
@@ -97,33 +76,21 @@ Secondary items (accumulate in core `CHANGELOG.md` `[Unreleased]`):
 
 ## Open Items
 
-- **v0.4.0 deletion gating** — physically removing
-  `eventbus/inbox/memory.go` was originally gated on **two**
-  conditions; **only (a) remains open** as of 2026-05-20:
-  1. ~~**Downstream services have migrated their import path** from
-     `go-ddd-core/eventbus/inbox` to `go-ddd-adapters/eventbus/inbox`~~
-     — **SATISFIED 2026-05-20** by user-supplied formal answer:
-     `consumer inventory = []` (personal repo, no external
-     consumers). Recorded as a discipline-preserving closure rather
-     than a process shortcut: the same gating framework will apply
-     unchanged if this repo ever gains external consumers, but for
-     the current state the inventory legitimately resolves empty.
-  2. ~~`go-ddd-adapters` has cut its next release after v0.3.0~~ —
-     **SATISFIED 2026-05-20** by `v0.4.0` annotated tag `bc9b041`
-     (pgx Outbox + pgx TxManager cycle). The "one more release
-     cycle" overlap window in adapters CHANGELOG has now been
-     burned; removing the core copy no longer breaks the published
-     guarantee.
+- ~~**v0.4.0 deletion gating**~~ ✅ resolved 2026-05-20 (both
+  gates closed) and shipped 2026-05-21:
+  1. Downstream consumer migration — `consumer inventory = []`
+     (personal repo, no external consumers).
+  2. Adapters past v0.3.0 — `v0.4.0` annotated tag `bc9b041`
+     burned the "one more release cycle" overlap window.
 
-  Net: **both gates closed 2026-05-20**. Core v0.4.0 deletion is
-  unblocked. The cross-repo dependency that previously coupled
-  core's release cadence to adapters' release cadence is now
-  resolved, and the empty downstream inventory was recorded as a
-  formal answer (not bypassed).
+  The same gating framework still applies if this repo ever
+  gains external consumers — record any new consumer in
+  cross-repo memory before a future breaking removal.
 
 ## Verification (post-cycle)
 
-- core `main` @ `d9c8e5c`: `go test ./...` last passed during PR #3
-  local verification.
-- adapters `main` @ `ab92ea3`: `go test ./...` last passed during PR #5
-  local verification (both modules, plus `go vet -tags=integration`).
+- core `main` @ `aadde89`: `go test ./...` last passed 2026-05-21
+  pre-tag (post-merge tip); `gofmt -l .`, `go vet ./...`,
+  `go build ./...` also clean.
+- adapters `main` @ `d438c0a`: `go test ./...` last passed during
+  the v0.4.0 cycle (both modules, plus `go vet -tags=integration`).
