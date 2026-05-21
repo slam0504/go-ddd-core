@@ -256,12 +256,11 @@ if err := publisher.Publish(ctx, "orders", order.DomainEvents()...); err != nil 
 - Consumer side: deduplicate redelivered messages via `Seen` / `Record`
   keyed by [`eventbus.InboxKey{Consumer, EventID}`](../eventbus/inbox.go),
   so each consumer (projector, reactor, saga) records its own progress
-  independently. The recommended `Memory` import is
+  independently. Import the implementation from
   [`go-ddd-adapters/eventbus/inbox`](https://github.com/slam0504/go-ddd-adapters/tree/main/eventbus/inbox)
-  (adds `WithTTL`, `WithMaxSize`, `WithClock`); the same type still lives
-  at [`go-ddd-core/eventbus/inbox`](../eventbus/inbox/memory.go) during the
-  v0.3.0 → v0.4.0 transition — see the
-  [Note](#note-on-eventbusinboxmemorygo) below.
+  (in-process `Memory` with `WithMaxSize` / `WithTTL` / `WithClock`
+  options). The contract — `eventbus.Inbox` interface and `InboxKey`
+  type — lives in this repo; only the implementation lives in adapters.
 
 ```go
 // ✅ Use this (producer)
@@ -415,41 +414,36 @@ For tests, write a minimal in-memory store inside the test package
 itself, or import a test utility from `go-ddd-adapters`. Do not depend
 on a "core in-memory EventStore" that has never existed.
 
-### Note on `eventbus/inbox/memory.go`
+### Historical note: the v0.4.0 `eventbus/inbox` removal
 
-`Memory` is a historical exception: an in-memory Inbox shipped with
-v0.2.0 before the infrastructure-client-free boundary was made
-explicit. It is preserved for backward compatibility in v0.3.0 and
-**slated for physical removal in v0.4.0**.
+The in-process `Memory` Inbox originally shipped at
+`go-ddd-core/eventbus/inbox/memory.go` in **v0.2.0**, before the
+infrastructure-client-free boundary was made explicit. It was
+preserved as a backward-compatibility carve-out in **v0.3.0**
+(2026-05-15) with a `### Deprecated` notice, then physically removed
+in **v0.4.0** (2026-05-20) along with its test file. The entire
+`eventbus/inbox/` sub-package no longer exists in core.
 
-**Status as of `go-ddd-adapters v0.4.0` (2026-05-20):** the
-relocation target has been shipped and the overlap window is now
-closed. Both `v0.3.0` (which first relocated `Memory` to adapters
-with added `WithTTL` and `WithClock` options) and `v0.4.0` (pgx
-Outbox + pgx TxManager, Go 1.25) are tagged on `go-ddd-adapters`.
-Downstream services should migrate the import path; call sites stay
-identical:
+The implementation now lives at
+[`go-ddd-adapters/eventbus/inbox`](https://github.com/slam0504/go-ddd-adapters/tree/main/eventbus/inbox)
+(since `go-ddd-adapters v0.3.0`, with added `WithTTL` and `WithClock`
+options on top of the 1:1 relocation). The public contract —
+`eventbus.Inbox` interface and `eventbus.InboxKey` value type — was
+**never** in the deleted sub-package; it lives in
+[`eventbus/inbox.go`](../eventbus/inbox.go) under `package eventbus`
+and is unchanged by the removal.
 
-```go
-// before
-import "github.com/slam0504/go-ddd-core/eventbus/inbox"
-
-// after
-import "github.com/slam0504/go-ddd-adapters/eventbus/inbox"
-// inbox.NewMemory(...) unchanged
-```
-
-The deletion in this repo was originally gated on **both** (a)
-downstream services completing the import-path migration above and
-(b) `go-ddd-adapters` advancing past `v0.3.0` so the published "one
-more release cycle" overlap guarantee was honoured. Condition (b)
-was satisfied when `go-ddd-adapters v0.4.0` was tagged on
-2026-05-20. **Only (a) remains** before the core copy can be
-physically removed.
-
-New adapter-level test utilities should not depend on the core copy
-as a long-term API — point at `go-ddd-adapters/eventbus/inbox`
-directly.
+The removal was gated on two conditions and held for the full
+deprecation cycle: (a) downstream consumer migration off the old
+import path, and (b) `go-ddd-adapters` cutting a release past
+`v0.3.0` so the "one more release cycle" overlap guarantee shipped
+in the adapters v0.3.0 CHANGELOG was honoured. Condition (b) was
+satisfied by `go-ddd-adapters v0.4.0` on 2026-05-20; condition (a)
+resolved as `consumer inventory = []` (personal repo, no external
+consumers) on the same day. Both gates closing on the same day was a
+scheduling coincidence — the discipline of running both gates
+separately is preserved so the same framework applies cleanly if
+this repo ever gains external consumers.
 
 ---
 
