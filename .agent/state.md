@@ -1,11 +1,17 @@
 # go-ddd-core State
 
-Last verified: 2026-05-25 Asia/Taipei (v0.5.0 SHIPPED — Latest release)
-Source: verified via `git log` on `main` @ `e2ee2bb` (merge of PR #7
-release/v0.5.0-prep), `git tag v0.5.0` push at `e2ee2bb` (tag object
-`543cbf3`), `gh release view v0.5.0` confirming Latest marker, and
-local `gofmt -l .` (clean), `go vet ./...`, `go build ./...`,
-`go test ./...` (all packages PASS) against `main` HEAD on 2026-05-25.
+Last verified: 2026-05-26 Asia/Taipei (v0.5.0 cycle fully closed — both halves)
+Source: core verified via `git log` on `main` @ `e2ee2bb` (merge of PR #7
+release/v0.5.0-prep), `git ls-remote --tags origin v0.5.0` returning
+`543cbf3 refs/tags/v0.5.0`, `gh release view v0.5.0` confirming Latest,
+and local `gofmt -l .` (clean), `go vet ./...`, `go build ./...`,
+`go test ./...` (all packages PASS) on 2026-05-25. Adapter side
+synchronised 2026-05-26 from the adapter session: PR #22 dep-bump
+merged at `45274dd` (2026-05-26 00:03:52 Asia/Taipei, CI 5/5 on
+workflow `26409070511`), adapters `v0.5.0` annotated tag (object
+`a02f6d4` → `45274dd`) pushed, GitHub Release published as Latest
+(2026-05-26 00:08:32 Asia/Taipei) at
+https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
 ## v0.3.0 Release Cycle: CLOSED
 
@@ -20,9 +26,10 @@ local `gofmt -l .` (clean), `go vet ./...`, `go build ./...`,
 - core `main` head: `e2ee2bb` `Merge pull request #7 from slam0504/release/v0.5.0-prep`
 - core working branch: *(none — back on `main`)*
 - core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`)
-- adapters `main` head: `d9c7324` (PR #21: transport/http/stdlib + health,
-  v0.5.0 adapter cycle; pinned to `core@main` pseudo-version pending
-  the tiny follow-up dep-bump PR to `core v0.5.0`)
+- adapters `main` head: `3dac600` (post-release bookkeeping on top of
+  PR #22 merge at `45274dd`, which bumped `go-ddd-core` from the
+  `core@main` pseudo-version to the tagged `v0.5.0`)
+- adapters latest tag: `v0.5.0` at `45274dd` (annotated tag object `a02f6d4`)
 - Merged feature branches deleted from origin and locally:
   - `release/v0.3.0-prep` (core)
   - `release/v0.3.0-bump` (adapters)
@@ -67,13 +74,19 @@ Shipped scope on core:
 - `M CHANGELOG.md` — `[0.5.0] - 2026-05-25` section with `### Added` ports/health entry + cycle narrative (PR #7).
 - `M README.md` — Layout: `ports/` row now lists health; new `health/` sub-row marked `[v0.5.0]`. Drive-by removal of the stale `inbox/  Default in-memory Inbox implementation [v0.2.0]` sub-row that PR #4 (v0.4.0) missed (PR #6).
 
-Tag-gate (per the adapter agent's 4-step memory):
+Tag-gate (per the adapter agent's 4-step memory) — all four steps closed:
 
-1. ✅ adapter implementation merged on adapters `main` (`d9c7324`).
-2. ✅ core annotates `v0.5.0` at `e2ee2bb`, tag pushed to origin.
-3. ⏳ tiny follow-up PR on adapters: replace the `core@main`
-   pseudo-version in `go.mod` with the tagged `v0.5.0` and re-run CI.
-4. ⏳ adapters companion release / Latest marker once step 3 lands.
+1. ✅ adapter implementation merged on adapters `main` (`d9c7324`,
+   2026-05-25).
+2. ✅ core annotates `v0.5.0` at `e2ee2bb` (tag object `543cbf3`),
+   tag pushed to origin (2026-05-25).
+3. ✅ adapter dep-bump PR #22 (`core@main` pseudo-version → tagged
+   `v0.5.0`) merged at `45274dd` 2026-05-26 00:03:52 Asia/Taipei;
+   CI 5/5 on workflow `26409070511`.
+4. ✅ adapters `v0.5.0` annotated tag (object `a02f6d4` → `45274dd`)
+   pushed; GitHub Release published as Latest 2026-05-26 00:08:32
+   Asia/Taipei at
+   https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
 Verification on core `main` @ `e2ee2bb`:
 
