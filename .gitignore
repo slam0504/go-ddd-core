@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Agent tooling — keep .agent/ as the single durable memory channel; .serena/ is local
+.serena/
