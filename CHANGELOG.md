@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-25
+
+Inbound HTTP + health cycle. Core ships the shared probe contract;
+the first consumer — `transport/http/stdlib` with `/healthz` +
+`/readyz` handlers and graceful shutdown — lives in
+`go-ddd-adapters` (`go-ddd-adapters` PR #21, merged at `d9c7324`).
+Splitting the work this way keeps registries, aggregation policy,
+and HTTP handler shape out of core, where they would smuggle in
+framework opinions; adapters compose per-driver `health.Check`s
+behind their own registry.
+
 ### Added
 
 - New `ports/health` package providing the shared probe shape
