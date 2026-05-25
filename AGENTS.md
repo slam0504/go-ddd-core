@@ -1,7 +1,10 @@
 # go-ddd-core Agent Memory Rules
 
-Read `../AGENTS.md` first for the shared
-Claude/Codex protocol.
+Durable agent memory for this repo lives entirely under `.agent/`
+(state, decisions, review log). Cross-repo coordination with
+`go-ddd-adapters` is recorded in each repo's own `.agent/state.md`
+and synchronised by the operator across sessions; there is no
+shared file outside either repository.
 
 ## Project Role
 
@@ -15,9 +18,7 @@ repos unless the code is explicitly a contract.
 1. Read `.agent/state.md`.
 2. Read `.agent/decisions.md`.
 3. Read `.agent/review-log.md`.
-4. If work affects adapters or release coordination, read
-   `../.agent-memory/go-ddd.md`.
-5. Run:
+4. Run:
 
    ```sh
    git status --short
@@ -42,5 +43,7 @@ At the end of meaningful work, update:
 - `.agent/state.md`
 - `.agent/decisions.md` if a design is accepted or changed
 - `.agent/review-log.md` if CR findings were added or resolved
-- `../.agent-memory/go-ddd.md` for
-  cross-repo changes
+
+For cross-repo changes (release coordination with `go-ddd-adapters`),
+mirror the relevant state into the other repo's `.agent/state.md`
+during the same session — there is no shared file outside the repos.

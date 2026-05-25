@@ -143,16 +143,16 @@ Secondary items (accumulate in core `CHANGELOG.md` `[Unreleased]`):
   gains external consumers — record any new consumer in
   cross-repo memory before a future breaking removal.
 
-- **Cross-repo memory file missing**: `AGENTS.md` and `CLAUDE.md`
-  reference `../AGENTS.md` and `../.agent-memory/go-ddd.md` as the
-  shared Claude/Codex protocol + cross-repo coordination notes.
-  Verified 2026-05-25 that neither file exists in this checkout
-  (`/Users/eason/playground/project/` only holds `arkham-docs-server`,
-  `go-ddd-adapters`, `go-ddd-core`). Decide whether to (a) create the
-  pair so adapter-coordination state lives outside the per-repo
-  `.agent/`, or (b) drop the references from the two protocol docs.
-  Until resolved, v0.5.0 adapter-half coordination notes stay in this
-  file's v0.5.0 section above.
+- ~~**Cross-repo memory file missing**~~ ✅ resolved 2026-05-25 via
+  option (b): dropped the dangling references in `AGENTS.md` and
+  `CLAUDE.md`. Rationale: the parent dir is not a git repo, so any
+  shared markdown there has no version control, no review, and forces
+  every checkout to recreate a non-repo layout. Cross-repo
+  coordination with `go-ddd-adapters` now flows exclusively through
+  each repo's own `.agent/state.md`, synchronised by the operator
+  across sessions. If a future scale-up needs a versioned shared
+  memory, create a dedicated `go-ddd-meta` repo rather than dropping
+  loose files in the parent.
 
 ## Verification (post-cycle)
 
