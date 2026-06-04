@@ -24,11 +24,14 @@ Shipped on the branch:
 
 - `A ports/auth/auth.go` — `Identity` (Subject, TenantID, Roles, Claims),
   `TokenVerifier` + `TokenVerifierFunc`, sentinels `ErrTokenMissing` /
-  `ErrTokenInvalid` / `ErrTokenExpired` (all `CodeUnauthorized` → 401, declared
-  as `error` so the coded value is immutable), `WithIdentity` /
+  `ErrTokenInvalid` / `ErrTokenExpired` (all `CodeUnauthorized` → 401,
+  tamper-proof via an auth-private `tokenError` wrapper whose `Unwrap()` mints a
+  fresh `*errorsx.Error` per call — `errors.As` callers get a throwaway copy,
+  `errors.Is` still matches the sentinel), `WithIdentity` /
   `IdentityFromContext` with slice/map clone isolation.
-- `A ports/auth/auth_test.go` — 8 contract tests incl. mandatory
-  `httpx.Translate` → 401, slice/map mutation isolation, and
+- `A ports/auth/auth_test.go` — 9 contract tests incl. mandatory
+  `httpx.Translate` → 401, sentinel tamper-proofing (`errors.As` mutation does
+  not corrupt the 401 mapping), slice/map mutation isolation, and
   direct-implementation cases.
 - `M CHANGELOG.md` — `[Unreleased] ### Added` ports/auth entry (no version).
 - `M README.md` — `ports/` parenthetical + `auth/` sub-row `[unreleased]`.
@@ -48,9 +51,10 @@ Verification on `feat/ports-auth` 2026-06-04: `go vet ./...`,
 
 ## Current Branch / Heads
 
-- core `main` head: `e2ee2bb` `Merge pull request #7 from slam0504/release/v0.5.0-prep`
-- core working branch: `feat/ports-auth` (v0.6.0 AuthN contract; PR open, unmerged, untagged)
-- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`)
+- core `main` head: `5034638` `chore(agent): sync v0.5.0 adapter close into core state`
+  (3 `chore(agent)` commits ahead of the `v0.5.0` tag at `e2ee2bb`)
+- core working branch: `feat/ports-auth` (v0.6.0 AuthN contract; PR #8 open, unmerged, untagged; branched off `main` @ `5034638`)
+- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`; tag is immutable at the PR #7 merge — `main` has since advanced to `5034638`)
 - adapters `main` head: `3dac600` (post-release bookkeeping on top of
   PR #22 merge at `45274dd`, which bumped `go-ddd-core` from the
   `core@main` pseudo-version to the tagged `v0.5.0`)

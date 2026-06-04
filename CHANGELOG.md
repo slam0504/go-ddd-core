@@ -17,8 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     plus an `auth.TokenVerifierFunc` adapter for plain functions.
   - Sentinels `ErrTokenMissing` / `ErrTokenInvalid` / `ErrTokenExpired`, all
     coded `errorsx.CodeUnauthorized` so `pkg/errorsx/httpx` maps them to HTTP
-    401 with no per-adapter table. Declared as `error` (not `*errorsx.Error`)
-    so the shared coded value cannot be mutated by callers.
+    401 with no per-adapter table. They are tamper-proof: each is an
+    auth-private wrapper whose `Unwrap` mints a fresh `*errorsx.Error` per
+    call, so a caller reaching the coded value via `errors.As` mutates only a
+    throwaway copy and cannot corrupt the shared 401 mapping. `errors.Is` still
+    matches the sentinel itself.
   - `auth.WithIdentity` / `auth.IdentityFromContext` context helpers; both
     clone `Roles`/`Claims` so an identity stored in a context cannot be
     mutated through an alias.

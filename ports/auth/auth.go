@@ -61,16 +61,31 @@ func (f TokenVerifierFunc) Verify(ctx context.Context, token string) (Identity, 
 	return f(ctx, token)
 }
 
-// Token verification sentinels. Each is declared with static type error (not
-// *errorsx.Error) so callers cannot mutate the shared coded value through its
-// exported fields and silently break the 401 mapping. The CodeUnauthorized
-// surface is still reachable via errorsx.CodeOf (errors.As), and identity
-// comparison still works via errors.Is. All three map to HTTP 401 through
-// pkg/errorsx/httpx.
+// tokenError is an immutable, errorsx-coded sentinel. It holds only an
+// unexported message and exposes the CodeUnauthorized surface through Unwrap,
+// which mints a fresh *errorsx.Error on every call. A caller reaching the coded
+// value via errorsx.CodeOf / httpx.Translate (both errors.As) therefore mutates
+// only a throwaway copy — the shared sentinel and its 401 mapping cannot be
+// corrupted. Identity comparison still works via errors.Is because that matches
+// the sentinel pointer itself before ever unwrapping.
+type tokenError struct {
+	msg string
+}
+
+func (e *tokenError) Error() string {
+	return string(errorsx.CodeUnauthorized) + ": " + e.msg
+}
+
+func (e *tokenError) Unwrap() error {
+	return errorsx.New(errorsx.CodeUnauthorized, e.msg)
+}
+
+// Token verification sentinels. All three map to HTTP 401 through
+// pkg/errorsx/httpx; see tokenError for why they are tamper-proof.
 var (
-	ErrTokenMissing error = errorsx.New(errorsx.CodeUnauthorized, "auth: token missing")
-	ErrTokenInvalid error = errorsx.New(errorsx.CodeUnauthorized, "auth: token invalid")
-	ErrTokenExpired error = errorsx.New(errorsx.CodeUnauthorized, "auth: token expired")
+	ErrTokenMissing error = &tokenError{msg: "auth: token missing"}
+	ErrTokenInvalid error = &tokenError{msg: "auth: token invalid"}
+	ErrTokenExpired error = &tokenError{msg: "auth: token expired"}
 )
 
 // ctxKey is unexported so an Identity stored here cannot collide with another

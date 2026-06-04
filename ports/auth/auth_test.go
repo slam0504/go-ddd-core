@@ -74,6 +74,27 @@ func TestSentinels_MapToHTTP401(t *testing.T) {
 	}
 }
 
+// TestSentinels_Immutable guards the tamper-proof contract: a caller that
+// reaches the coded value via errors.As and mutates its exported fields must
+// not corrupt the shared sentinel's code or its 401 mapping. The sentinel's
+// Unwrap mints a fresh *errorsx.Error each call, so the extracted value is a
+// throwaway copy. This test fails if the sentinels are plain *errorsx.Error.
+func TestSentinels_Immutable(t *testing.T) {
+	var ex *errorsx.Error
+	if !errors.As(auth.ErrTokenMissing, &ex) {
+		t.Fatal("ErrTokenMissing does not unwrap to *errorsx.Error")
+	}
+	ex.Code = errorsx.CodeInternal
+	ex.Message = "tampered"
+
+	if got := errorsx.CodeOf(auth.ErrTokenMissing); got != errorsx.CodeUnauthorized {
+		t.Errorf("sentinel code mutated to %q, want %q", got, errorsx.CodeUnauthorized)
+	}
+	if _, status := httpx.Translate(auth.ErrTokenMissing); status != http.StatusUnauthorized {
+		t.Errorf("sentinel status mutated to %d, want %d", status, http.StatusUnauthorized)
+	}
+}
+
 func TestWithIdentity_RoundTrip(t *testing.T) {
 	want := auth.Identity{
 		Subject:  "user-1",

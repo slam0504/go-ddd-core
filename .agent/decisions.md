@@ -60,9 +60,15 @@ resolution are deliberately out (see `docs/roadmap.md` v0.6.0 / v0.6.x).
   yields `ErrTokenExpired`, not an Identity carrying expiry. Keeps the shape
   shareable across JWT / opaque / session / API-key verifiers.
 - **Sentinels are `errorsx`-coded, all `CodeUnauthorized`** (→ HTTP 401 via
-  `pkg/errorsx/httpx`), so adapters need no per-error mapping table. Declared
-  with static type `error` (not `*errorsx.Error`) so callers cannot mutate the
-  shared coded value's exported fields and silently break the 401 mapping.
+  `pkg/errorsx/httpx`), so adapters need no per-error mapping table. They are
+  **tamper-proof via an auth-private `tokenError` wrapper**: it carries only an
+  unexported message, and its `Unwrap()` mints a fresh `*errorsx.Error` on
+  every call. `errorsx.CodeOf` / `httpx.Translate` (both `errors.As`) thus get
+  a throwaway copy — mutating it cannot corrupt the shared sentinel's code or
+  401 mapping — while `errors.Is` still matches the sentinel pointer itself.
+  An earlier attempt declared the sentinels as static type `error` over a bare
+  `errorsx.New(...)`; that only blocked direct field writes, since `errors.As`
+  still handed callers the live `*errorsx.Error` pointer (review-caught).
   **403 / `CodeForbidden` stays out of `TokenVerifier`** — that is AuthZ.
 - **ctx helpers live in `ports/auth`, not `pkg/contextx`.** Identity is a
   struct, so it cannot reuse contextx's string-only `stringValue`; keeping the
