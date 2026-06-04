@@ -48,3 +48,34 @@ Last verified: 2026-05-15 Asia/Taipei
   it for backward compatibility and announces the upcoming move via
   CHANGELOG `### Deprecated` and `docs/anti-patterns.md` "Note on
   `eventbus/inbox/memory.go`".
+
+## AuthN Contract (v0.6.0, `ports/auth`)
+
+Added on branch `feat/ports-auth` 2026-06-04. Scope is AuthN only — who the
+caller is. AuthZ (permissions / 403), token issuance, and multi-tenant
+resolution are deliberately out (see `docs/roadmap.md` v0.6.0 / v0.6.x).
+
+- **`Identity` = 4 fields** (Subject, TenantID, Roles, Claims). No `ExpiresAt` /
+  `IssuedAt` — token lifetime is the verifier's concern; an expired token
+  yields `ErrTokenExpired`, not an Identity carrying expiry. Keeps the shape
+  shareable across JWT / opaque / session / API-key verifiers.
+- **Sentinels are `errorsx`-coded, all `CodeUnauthorized`** (→ HTTP 401 via
+  `pkg/errorsx/httpx`), so adapters need no per-error mapping table. Declared
+  with static type `error` (not `*errorsx.Error`) so callers cannot mutate the
+  shared coded value's exported fields and silently break the 401 mapping.
+  **403 / `CodeForbidden` stays out of `TokenVerifier`** — that is AuthZ.
+- **ctx helpers live in `ports/auth`, not `pkg/contextx`.** Identity is a
+  struct, so it cannot reuse contextx's string-only `stringValue`; keeping the
+  helpers with the contract also avoids a `contextx → ports` back-dependency.
+  `WithIdentity` / `IdentityFromContext` clone `Roles` / `Claims` on both write
+  and read so a context-stored identity cannot be mutated through an alias;
+  nested `Claims` values are documented immutable.
+- **`TokenVerifierFunc`**, not a bare `VerifierFunc` — the `Token` qualifier
+  leaves the plain name free for a future AuthZ verifier. Mirrors the repo's
+  single-method func-adapter pattern (`command.HandlerFunc`, etc.).
+- **`ErrTokenMissing` ownership**: transport middleware may return it before
+  calling `Verify` (e.g. no Authorization header); a verifier invoked with an
+  empty token should also return it, so behaviour stays consistent across
+  adapters.
+- **Tag gate**: the contract ships unreleased; the v0.6.0 tag waits for the
+  first adapter consumer, the same discipline used for v0.5.0.
