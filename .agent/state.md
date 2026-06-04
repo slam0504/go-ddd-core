@@ -1,6 +1,10 @@
 # go-ddd-core State
 
-Last verified: 2026-05-26 Asia/Taipei (v0.5.0 cycle fully closed — both halves)
+Last verified: 2026-06-04 Asia/Taipei (v0.6.0 AuthN contract merged to `main`
+@ `6885ddf` via PR #8; untagged pending the adapter consumer). Verified via
+`gh pr checks 8` green + `gh pr merge 8 --merge --delete-branch` (fast-forward
+to `6885ddf`), local `go vet`/`build`/`test -race`/`gofmt -l` clean at the
+pre-merge tip `c3243aa`.
 Source: core verified via `git log` on `main` @ `e2ee2bb` (merge of PR #7
 release/v0.5.0-prep), `git ls-remote --tags origin v0.5.0` returning
 `543cbf3 refs/tags/v0.5.0`, `gh release view v0.5.0` confirming Latest,
@@ -13,14 +17,20 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## v0.6.0 AuthN Cycle: IN PROGRESS (started 2026-06-04)
+## v0.6.0 AuthN Cycle: CONTRACT MERGED, AWAITING TAG (started 2026-06-04)
 
-Branch `feat/ports-auth` off `main` @ `5034638`. Core adds the AuthN contract
-`ports/auth`; PR open (unmerged), **no tag** — v0.6.0 is tagged only when the
-first adapter consumer (`auth/jwt` + HTTP middleware in `go-ddd-adapters`)
-lands, the same gate used for v0.5.0.
+Core AuthN contract `ports/auth` **merged to `main`**: PR #8
+(`feat/ports-auth` → `main`) merged via merge commit `6885ddf` 2026-06-04
+16:43:40 +0800; branch `feat/ports-auth` deleted local + remote. Two commits
+landed on the branch — `d4811f1` (contract) and `c3243aa` (review fix: make
+sentinels tamper-proof via the `tokenError` wrapper). Codex review passed; CI
+green on `c3243aa` (build+test + golangci-lint).
 
-Shipped on the branch:
+**No tag** — v0.6.0 is tagged only when the first adapter consumer (`auth/jwt`
++ HTTP middleware in `go-ddd-adapters`) lands, the same gate used for v0.5.0.
+Until then the contract ships in `main` under CHANGELOG `[Unreleased]`.
+
+Shipped (now on `main`):
 
 - `A ports/auth/auth.go` — `Identity` (Subject, TenantID, Roles, Claims),
   `TokenVerifier` + `TokenVerifierFunc`, sentinels `ErrTokenMissing` /
@@ -38,8 +48,9 @@ Shipped on the branch:
 
 Design rationale recorded in `.agent/decisions.md` "AuthN Contract (v0.6.0)".
 
-Verification on `feat/ports-auth` 2026-06-04: `go vet ./...`,
-`go build ./...`, `go test -race ./...` all PASS; `gofmt -l .` clean.
+Verification at `c3243aa` (pre-merge tip) 2026-06-04: `go vet ./...`,
+`go build ./...`, `go test -race ./...` all PASS (incl. 9 `ports/auth` tests);
+`gofmt -l .` clean. CI green on PR #8 @ `c3243aa` (build+test + golangci-lint).
 
 ## v0.3.0 Release Cycle: CLOSED
 
@@ -51,10 +62,10 @@ Verification on `feat/ports-auth` 2026-06-04: `go vet ./...`,
 
 ## Current Branch / Heads
 
-- core `main` head: `5034638` `chore(agent): sync v0.5.0 adapter close into core state`
-  (3 `chore(agent)` commits ahead of the `v0.5.0` tag at `e2ee2bb`)
-- core working branch: `feat/ports-auth` (v0.6.0 AuthN contract; PR #8 open, unmerged, untagged; branched off `main` @ `5034638`)
-- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`; tag is immutable at the PR #7 merge — `main` has since advanced to `5034638`)
+- core `main` head: `6885ddf` `Merge pull request #8 from slam0504/feat/ports-auth`
+  (v0.6.0 AuthN contract merged; ahead of the `v0.5.0` tag at `e2ee2bb`)
+- core working branch: none (`feat/ports-auth` merged + deleted; `chore/sync-ports-auth-merged` carries this bookkeeping update)
+- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`; tag is immutable at the PR #7 merge — `main` has since advanced to `6885ddf`, which is untagged pending the v0.6.0 adapter consumer)
 - adapters `main` head: `3dac600` (post-release bookkeeping on top of
   PR #22 merge at `45274dd`, which bumped `go-ddd-core` from the
   `core@main` pseudo-version to the tagged `v0.5.0`)
@@ -66,6 +77,7 @@ Verification on `feat/ports-auth` 2026-06-04: `go vet ./...`,
   - `docs/roadmap` (core, deleted 2026-05-21 post-merge)
   - `feat/ports-health` (core, deleted 2026-05-21 post-merge)
   - `release/v0.5.0-prep` (core, deleted 2026-05-25 post-tag)
+  - `feat/ports-auth` (core, deleted 2026-06-04 post-merge of PR #8)
 
 ## Worktree
 
