@@ -13,6 +13,34 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
+## v0.6.0 AuthN Cycle: IN PROGRESS (started 2026-06-04)
+
+Branch `feat/ports-auth` off `main` @ `5034638`. Core adds the AuthN contract
+`ports/auth`; PR open (unmerged), **no tag** — v0.6.0 is tagged only when the
+first adapter consumer (`auth/jwt` + HTTP middleware in `go-ddd-adapters`)
+lands, the same gate used for v0.5.0.
+
+Shipped on the branch:
+
+- `A ports/auth/auth.go` — `Identity` (Subject, TenantID, Roles, Claims),
+  `TokenVerifier` + `TokenVerifierFunc`, sentinels `ErrTokenMissing` /
+  `ErrTokenInvalid` / `ErrTokenExpired` (all `CodeUnauthorized` → 401,
+  tamper-proof via an auth-private `tokenError` wrapper whose `Unwrap()` mints a
+  fresh `*errorsx.Error` per call — `errors.As` callers get a throwaway copy,
+  `errors.Is` still matches the sentinel), `WithIdentity` /
+  `IdentityFromContext` with slice/map clone isolation.
+- `A ports/auth/auth_test.go` — 9 contract tests incl. mandatory
+  `httpx.Translate` → 401, sentinel tamper-proofing (`errors.As` mutation does
+  not corrupt the 401 mapping), slice/map mutation isolation, and
+  direct-implementation cases.
+- `M CHANGELOG.md` — `[Unreleased] ### Added` ports/auth entry (no version).
+- `M README.md` — `ports/` parenthetical + `auth/` sub-row `[unreleased]`.
+
+Design rationale recorded in `.agent/decisions.md` "AuthN Contract (v0.6.0)".
+
+Verification on `feat/ports-auth` 2026-06-04: `go vet ./...`,
+`go build ./...`, `go test -race ./...` all PASS; `gofmt -l .` clean.
+
 ## v0.3.0 Release Cycle: CLOSED
 
 - core PR #3 merged at `d9c8e5c` (2026-05-15T06:24:25Z)
@@ -23,9 +51,10 @@ https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
 ## Current Branch / Heads
 
-- core `main` head: `e2ee2bb` `Merge pull request #7 from slam0504/release/v0.5.0-prep`
-- core working branch: *(none — back on `main`)*
-- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`)
+- core `main` head: `5034638` `chore(agent): sync v0.5.0 adapter close into core state`
+  (3 `chore(agent)` commits ahead of the `v0.5.0` tag at `e2ee2bb`)
+- core working branch: `feat/ports-auth` (v0.6.0 AuthN contract; PR #8 open, unmerged, untagged; branched off `main` @ `5034638`)
+- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`; tag is immutable at the PR #7 merge — `main` has since advanced to `5034638`)
 - adapters `main` head: `3dac600` (post-release bookkeeping on top of
   PR #22 merge at `45274dd`, which bumped `go-ddd-core` from the
   `core@main` pseudo-version to the tagged `v0.5.0`)

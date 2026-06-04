@@ -25,8 +25,9 @@ application/
   usecase/                Lightweight UseCase[D, R] + AsCommandHandler / AsQueryHandler [v0.2.0]
 eventsourcing/            EventStore, SnapshotStore, Projector
 eventbus/                 Publisher/Subscriber (watermill contract), Outbox, Inbox
-ports/                    Infra interfaces (logger, cache, database, storage, httpclient, observability, health)
+ports/                    Infra interfaces (logger, cache, database, storage, httpclient, observability, health, auth)
   health/                 Liveness/readiness probe contract [v0.5.0]
+  auth/                   AuthN contract: Identity + TokenVerifier [unreleased]
 transport/                Server contracts (http, grpc, graphql) — no library deps
   grpc/                   + interceptor combinators + errorsx → grpc Status mapping [v0.2.0]
   graphql/                + Loader contract, Relay cursor codec, FilterInput → Specification [v0.2.0]

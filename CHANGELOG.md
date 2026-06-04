@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `ports/auth` package: the authentication (AuthN) contract for
+  downstream services. Surfaces:
+  - `auth.Identity` — the verified principal (Subject, TenantID, Roles,
+    Claims).
+  - `auth.TokenVerifier` interface (`Verify(ctx, token) (Identity, error)`)
+    plus an `auth.TokenVerifierFunc` adapter for plain functions.
+  - Sentinels `ErrTokenMissing` / `ErrTokenInvalid` / `ErrTokenExpired`, all
+    coded `errorsx.CodeUnauthorized` so `pkg/errorsx/httpx` maps them to HTTP
+    401 with no per-adapter table. They are tamper-proof: each is an
+    auth-private wrapper whose `Unwrap` mints a fresh `*errorsx.Error` per
+    call, so a caller reaching the coded value via `errors.As` mutates only a
+    throwaway copy and cannot corrupt the shared 401 mapping. `errors.Is` still
+    matches the sentinel itself.
+  - `auth.WithIdentity` / `auth.IdentityFromContext` context helpers; both
+    clone `Roles`/`Claims` so an identity stored in a context cannot be
+    mutated through an alias.
+
+  Authorization (role/permission checks, 403), token issuance, and the JWT
+  verifier adapter are out of scope here (see `docs/roadmap.md` v0.6.0). Core
+  ships only the contract; the first consumer (an `auth/jwt` adapter + HTTP
+  middleware in `go-ddd-adapters`) gates the release tag.
+
 ## [0.5.0] - 2026-05-25
 
 Inbound HTTP + health cycle. Core ships the shared probe contract;
