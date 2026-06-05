@@ -7,12 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-05
+
 AuthZ contract. Core adds the authorization counterpart to the v0.6.0 AuthN
 contract: who the caller is (`Identity`) stays in `auth.go`; whether they may
 act (`Authorizer`) lands in `authz.go`. Core ships only the contract — concrete
 policy engines (RBAC / ABAC / OPA / Casbin) and enforcement middleware live in
-adapters. The release will be gated on the first adapter consumer, the same
-tag-gate discipline used for v0.5.0 and v0.6.0.
+adapters. The tag gate is satisfied by the first consumer — an `auth/casbin`
+Authorizer adapter in `go-ddd-adapters` (PR #25) — the same tag-gate discipline
+used for v0.5.0 and v0.6.0. v0.7.0 is independent of the v0.6.0 AuthN cycle:
+v0.6.x stays reserved for AuthN/JWT/Bearer fixes, v0.7.0 introduces AuthZ.
 
 ### Added
 

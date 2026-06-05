@@ -148,7 +148,10 @@ issuance stay out of core.
   `Identity.Clone()`. No enforcement helper / middleware (those smuggle in
   transport/use-case opinions and have no consumer evidence yet), matching the
   v0.6.0 minimalism.
-- **Tag gate**: ships unreleased until the first adapter consumer lands (an
-  `authz/*` policy adapter in `go-ddd-adapters`); the version (v0.6.x vs v0.7.0,
-  a minor bump under semver since it adds exported API) is decided at
-  release-prep, same discipline as v0.5.0 / v0.6.0.
+- **Tag gate** (satisfied 2026-06-05): the contract shipped unreleased until the
+  first adapter consumer landed — the `auth/casbin` Authorizer adapter (Phase A)
+  in `go-ddd-adapters` PR #25 (merged, pinning core at pseudo-version `47e02fa`).
+  Version resolved to **v0.7.0** at release-prep: AuthZ adds exported API → semver
+  minor bump from v0.6.0, and v0.7.0 stays independent of the closed v0.6.0 AuthN
+  cycle (v0.6.x reserved for AuthN/JWT/Bearer fixes). `v0.7.0` was then cut, the
+  same discipline used for v0.5.0 / v0.6.0.
