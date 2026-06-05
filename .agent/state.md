@@ -22,14 +22,22 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## AuthZ Contract Cycle: CONTRACT MERGED
+## AuthZ Contract Cycle: RELEASE-PREP (v0.7.0)
 
-Merged 2026-06-05 via PR #13 (`feat/ports-authz`, CI green + Codex no findings),
-merge commit `64b6bf6` on top of `ef08343`. Core adds the authorization
-counterpart to the v0.6.0 AuthN contract, in the **same `ports/auth` package**.
-Contract only — no adapter, **no tag yet** (tag-gate on the first `authz/*`
-adapter consumer in `go-ddd-adapters`, same discipline as v0.5.0 / v0.6.0).
-CHANGELOG entry stays under `[Unreleased]` until that release-prep.
+Contract merged 2026-06-05 via PR #13 (`feat/ports-authz`, CI green + Codex no
+findings), merge commit `64b6bf6` on top of `ef08343`; state sync PR #14
+(`47e02fa`). Core adds the authorization counterpart to the v0.6.0 AuthN
+contract, in the **same `ports/auth` package**.
+
+Tag gate **satisfied** 2026-06-05 by the first consumer — `go-ddd-adapters`
+PR #25 `auth/casbin` Authorizer adapter (Phase A), merged pinning core at
+pseudo-version `47e02fa`. Version resolved to **v0.7.0** (AuthZ adds exported
+API → semver minor from v0.6.0; independent of the closed v0.6.0 AuthN cycle).
+This release-prep moves the CHANGELOG entry from `[Unreleased]` to
+`[0.7.0] - 2026-06-05`, updates the README `auth/` row to `[v0.7.0]`, and marks
+the decisions.md tag gate satisfied. Tag + GitHub Release + adapter dep-bump
+follow after this PR merges (recorded in a bookkeeping sync), same cross-repo
+ritual as v0.5.0 / v0.6.0.
 
 Shipped scope (now on `main`):
 
@@ -116,11 +124,11 @@ both repos now on matching `v0.6.0` tags.
 
 ## Current Branch / Heads
 
-- core `main` head: `64b6bf6` `Merge pull request #13 from slam0504/feat/ports-authz`
-  (AuthZ contract; this `chore/sync-authz-merged` bookkeeping commit advances
-  `main` by one merge on top — the unavoidable ±1 self-reference lag)
-- core working branch: `chore/sync-authz-merged` (state sync after PR #13 merge)
-- core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
+- core `main` head: `47e02fa` `Merge pull request #14 from slam0504/chore/sync-authz-merged`
+  (AuthZ state sync; this `release/v0.7.0-prep` branch will advance `main` by one
+  merge on top, which becomes the `v0.7.0` tag target)
+- core working branch: `release/v0.7.0-prep` (CHANGELOG→[0.7.0], README/decisions, awaiting tag)
+- core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); v0.7.0 pending this release-prep; prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
 - adapters `main` head: `1b0f3ae` `Merge pull request #24 from slam0504/chore/bump-core-v0.6.0`
   (dep-bump to `go-ddd-core v0.6.0`; consumer landed earlier in PR #23 `ae76f78`)
 - adapters latest tag: `v0.6.0` at `a9d4bfb` (→ `1b0f3ae`); prior `v0.5.0` at `45274dd` (object `a02f6d4`)
