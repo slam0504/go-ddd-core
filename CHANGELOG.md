@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+AuthZ contract. Core adds the authorization counterpart to the v0.6.0 AuthN
+contract: who the caller is (`Identity`) stays in `auth.go`; whether they may
+act (`Authorizer`) lands in `authz.go`. Core ships only the contract — concrete
+policy engines (RBAC / ABAC / OPA / Casbin) and enforcement middleware live in
+adapters. The release will be gated on the first adapter consumer, the same
+tag-gate discipline used for v0.5.0 and v0.6.0.
+
+### Added
+
+- `ports/auth` authorization (AuthZ) surfaces:
+  - `auth.Authorizer` interface
+    (`Allow(ctx, caller Identity, action string, resource Resource) error`)
+    plus an `auth.AuthorizerFunc` adapter for plain functions. `Allow` returns
+    `nil` to allow; `ErrForbidden` (including `%w`-wrapped) for a policy denial;
+    `ErrInvalidAuthorizationRequest` for malformed input; any other error means
+    the decision could not be made (return a coded `errorsx` value, e.g.
+    `CodeUnavailable`, to control the HTTP status).
+  - `auth.Resource` (`Type`, `ID`) — the authorization target. `ID == ""`
+    addresses a whole `Type` (collection-level); an empty `Type` is malformed
+    input.
+  - Sentinels `ErrForbidden` (coded `errorsx.CodeForbidden` → HTTP 403) and
+    `ErrInvalidAuthorizationRequest` (coded `errorsx.CodeInvalidArgument` →
+    HTTP 400). Both are tamper-proof through the same wrapper used by the AuthN
+    sentinels. Keeping malformed input distinct from a policy denial stops a
+    caller bug from masquerading as a 403.
+  - `auth.Identity.Clone()` — the previously private clone helper is now public,
+    so an `Authorizer` implementation that needs to retain a borrowed `caller`
+    (async audit, a queued decision, a separate goroutine) has an official copy.
+
+  `Allow` borrows `caller` read-only and does not clone; a zero `Identity` is
+  treated as malformed input, not as an anonymous principal. Authorization
+  enforcement (HTTP middleware), policy-engine wiring, and AuthZ adapters are
+  out of scope here (see `docs/roadmap.md`).
+
 ## [0.6.0] - 2026-06-05
 
 AuthN contract cycle. Core ships the authentication contract only — who the
