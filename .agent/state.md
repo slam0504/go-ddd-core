@@ -1,10 +1,12 @@
 # go-ddd-core State
 
-Last verified: 2026-06-04 Asia/Taipei (v0.6.0 AuthN contract merged to `main`
-@ `6885ddf` via PR #8; untagged pending the adapter consumer). Verified via
-`gh pr checks 8` green + `gh pr merge 8 --merge --delete-branch` (fast-forward
-to `6885ddf`), local `go vet`/`build`/`test -race`/`gofmt -l` clean at the
-pre-merge tip `c3243aa`.
+Last verified: 2026-06-05 Asia/Taipei (v0.6.0 AuthN cycle CLOSED — tag shipped).
+`v0.6.0` annotated tag (object `fd596cd` → merge commit `86b1e15`) pushed to
+origin; `gh api repos/.../releases/latest` returns `v0.6.0`, GitHub Release
+published as Latest at
+https://github.com/slam0504/go-ddd-core/releases/tag/v0.6.0. Release-prep
+PR #10 merged `86b1e15` after CI green; local `gofmt -l`/`go build`/`go test`
+clean at the pre-merge tip `2c4d0a8`.
 Source: core verified via `git log` on `main` @ `e2ee2bb` (merge of PR #7
 release/v0.5.0-prep), `git ls-remote --tags origin v0.5.0` returning
 `543cbf3 refs/tags/v0.5.0`, `gh release view v0.5.0` confirming Latest,
@@ -17,20 +19,27 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## v0.6.0 AuthN Cycle: CONTRACT MERGED, AWAITING TAG (started 2026-06-04)
+## v0.6.0 AuthN Cycle: CLOSED
 
-Core AuthN contract `ports/auth` **merged to `main`**: PR #8
-(`feat/ports-auth` → `main`) merged via merge commit `6885ddf` 2026-06-04
-16:43:40 +0800; branch `feat/ports-auth` deleted local + remote. Two commits
-landed on the branch — `d4811f1` (contract) and `c3243aa` (review fix: make
-sentinels tamper-proof via the `tokenError` wrapper). Codex review passed; CI
-green on `c3243aa` (build+test + golangci-lint).
+Release shipped 2026-06-05. Core ships the `ports/auth` AuthN contract only;
+the tag gate (first adapter consumer) was satisfied by `go-ddd-adapters`
+PR #23 (`auth/jwt` verifier + HTTP bearer-token middleware, merged `ae76f78`).
 
-**No tag** — v0.6.0 is tagged only when the first adapter consumer (`auth/jwt`
-+ HTTP middleware in `go-ddd-adapters`) lands, the same gate used for v0.5.0.
-Until then the contract ships in `main` under CHANGELOG `[Unreleased]`.
+Sequence:
 
-Shipped (now on `main`):
+- **Contract** — PR #8 (`feat/ports-auth` → `main`) merged `6885ddf`
+  2026-06-04. Two commits: `d4811f1` (contract) + `c3243aa` (review fix:
+  sentinels made tamper-proof via the `tokenError` wrapper). Codex review
+  passed; CI green on `c3243aa`. Branch deleted.
+- **Release prep** — PR #10 (`release/v0.6.0-prep` → `main`) merged `86b1e15`
+  2026-06-05: CHANGELOG `[Unreleased]` → `[0.6.0] - 2026-06-05`, README
+  `auth/` row → `[v0.6.0]`, `.agent/decisions.md` tag-gate marked satisfied.
+  CI green on `2c4d0a8`. Branch deleted.
+- **Tag** — `v0.6.0` annotated tag (object `fd596cd` → `86b1e15`) pushed to
+  origin; GitHub Release published as **Latest** at
+  https://github.com/slam0504/go-ddd-core/releases/tag/v0.6.0.
+
+Shipped scope on core (now on `main`):
 
 - `A ports/auth/auth.go` — `Identity` (Subject, TenantID, Roles, Claims),
   `TokenVerifier` + `TokenVerifierFunc`, sentinels `ErrTokenMissing` /
@@ -43,14 +52,21 @@ Shipped (now on `main`):
   `httpx.Translate` → 401, sentinel tamper-proofing (`errors.As` mutation does
   not corrupt the 401 mapping), slice/map mutation isolation, and
   direct-implementation cases.
-- `M CHANGELOG.md` — `[Unreleased] ### Added` ports/auth entry (no version).
-- `M README.md` — `ports/` parenthetical + `auth/` sub-row `[unreleased]`.
+- `M CHANGELOG.md` — `[0.6.0] - 2026-06-05` section with cycle narrative.
+- `M README.md` — `ports/` parenthetical + `auth/` sub-row `[v0.6.0]`.
 
 Design rationale recorded in `.agent/decisions.md` "AuthN Contract (v0.6.0)".
 
-Verification at `c3243aa` (pre-merge tip) 2026-06-04: `go vet ./...`,
-`go build ./...`, `go test -race ./...` all PASS (incl. 9 `ports/auth` tests);
-`gofmt -l .` clean. CI green on PR #8 @ `c3243aa` (build+test + golangci-lint).
+Out of scope (deferred to v0.6.x): authorization (role/permission checks,
+403) and token issuance.
+
+The `v0.6.0` tag is on proxy.golang.org once `go get` fetches it. Treat it as
+a permanent published version.
+
+Adapter follow-up (adapter agent's responsibility, separate repo): bump
+`go-ddd-adapters`' `go-ddd-core` dependency from the `core@main` pseudo-version
+to the tagged `v0.6.0`, then tag adapters' own release — the same 2-step
+cross-repo close used for v0.5.0.
 
 ## v0.3.0 Release Cycle: CLOSED
 
@@ -62,10 +78,11 @@ Verification at `c3243aa` (pre-merge tip) 2026-06-04: `go vet ./...`,
 
 ## Current Branch / Heads
 
-- core `main` head: `6885ddf` `Merge pull request #8 from slam0504/feat/ports-auth`
-  (v0.6.0 AuthN contract merged; ahead of the `v0.5.0` tag at `e2ee2bb`)
-- core working branch: none (`feat/ports-auth` merged + deleted; `chore/sync-ports-auth-merged` carries this bookkeeping update)
-- core latest tag: `v0.5.0` at `e2ee2bb` (annotated tag object `543cbf3`; tag is immutable at the PR #7 merge — `main` has since advanced to `6885ddf`, which is untagged pending the v0.6.0 adapter consumer)
+- core `main` head: `86b1e15` `Merge pull request #10 from slam0504/release/v0.6.0-prep`
+  (= the `v0.6.0` tag target; this `chore/record-v060-shipped` bookkeeping
+  commit advances `main` by one merge on top — the unavoidable ±1 self-reference lag)
+- core working branch: none (`chore/record-v060-shipped` carries this bookkeeping update, then deleted)
+- core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
 - adapters `main` head: `3dac600` (post-release bookkeeping on top of
   PR #22 merge at `45274dd`, which bumped `go-ddd-core` from the
   `core@main` pseudo-version to the tagged `v0.5.0`)
@@ -78,6 +95,7 @@ Verification at `c3243aa` (pre-merge tip) 2026-06-04: `go vet ./...`,
   - `feat/ports-health` (core, deleted 2026-05-21 post-merge)
   - `release/v0.5.0-prep` (core, deleted 2026-05-25 post-tag)
   - `feat/ports-auth` (core, deleted 2026-06-04 post-merge of PR #8)
+  - `release/v0.6.0-prep` (core, deleted 2026-06-05 post-tag)
 
 ## Worktree
 
