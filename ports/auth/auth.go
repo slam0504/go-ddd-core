@@ -1,8 +1,10 @@
-// Package auth defines the authentication contract: who the caller is
-// (Identity) and how a bearer token is verified (TokenVerifier). It contains
-// no infrastructure — JWT/JWKS, opaque-token introspection, and session lookup
-// live in adapters selected by downstream services. Authorization
-// (role/permission checks, 403) is intentionally out of scope here.
+// Package auth defines the authentication and authorization contracts:
+// who the caller is (Identity), how a bearer token is verified (TokenVerifier,
+// auth.go), and whether a caller may perform an action on a resource
+// (Authorizer, authz.go). It contains no infrastructure — JWT/JWKS,
+// opaque-token introspection, session lookup, and policy engines (RBAC / OPA /
+// Casbin) live in adapters selected by downstream services. Token issuance,
+// session management, and multi-tenant resolution remain out of scope here.
 package auth
 
 import (
@@ -14,8 +16,8 @@ import (
 )
 
 // Identity is the verified principal extracted from a token. It is a plain data
-// carrier: AuthZ decisions (role/permission checks) belong to a separate
-// contract and are intentionally absent here.
+// carrier: the authorization decision (role/permission checks) is the
+// Authorizer contract's job, not a field here.
 //
 // Roles and Claims are reference types; WithIdentity and IdentityFromContext
 // shallow-clone them so a value stored in a context cannot be mutated through
@@ -28,9 +30,14 @@ type Identity struct {
 	Claims   map[string]any // raw verifier-specific claims (issuer, exp, scopes, ...)
 }
 
-// clone returns a copy of id with Roles and Claims shallow-cloned. slices.Clone
-// and maps.Clone preserve nil, so a zero Identity round-trips unchanged.
-func (id Identity) clone() Identity {
+// Clone returns a copy of id with Roles and Claims shallow-cloned. slices.Clone
+// and maps.Clone preserve nil, so a zero Identity round-trips unchanged. Nested
+// values inside Claims are not deep-copied and must be treated as immutable.
+//
+// Authorizer.Allow borrows caller read-only and does not clone; an
+// implementation that retains the Identity beyond the call (async audit, a
+// queued decision, a separate goroutine) must Clone it first.
+func (id Identity) Clone() Identity {
 	id.Roles = slices.Clone(id.Roles)
 	id.Claims = maps.Clone(id.Claims)
 	return id
@@ -61,31 +68,33 @@ func (f TokenVerifierFunc) Verify(ctx context.Context, token string) (Identity, 
 	return f(ctx, token)
 }
 
-// tokenError is an immutable, errorsx-coded sentinel. It holds only an
-// unexported message and exposes the CodeUnauthorized surface through Unwrap,
-// which mints a fresh *errorsx.Error on every call. A caller reaching the coded
-// value via errorsx.CodeOf / httpx.Translate (both errors.As) therefore mutates
-// only a throwaway copy — the shared sentinel and its 401 mapping cannot be
-// corrupted. Identity comparison still works via errors.Is because that matches
-// the sentinel pointer itself before ever unwrapping.
-type tokenError struct {
-	msg string
+// codedError is an immutable, errorsx-coded sentinel shared by the AuthN and
+// AuthZ contracts. It holds only an unexported code and message and exposes the
+// coded surface through Unwrap, which mints a fresh *errorsx.Error on every
+// call. A caller reaching the coded value via errorsx.CodeOf / httpx.Translate
+// (both errors.As) therefore mutates only a throwaway copy — the shared
+// sentinel and its status mapping cannot be corrupted. Identity comparison
+// still works via errors.Is because that matches the sentinel pointer itself
+// before ever unwrapping.
+type codedError struct {
+	code errorsx.Code
+	msg  string
 }
 
-func (e *tokenError) Error() string {
-	return string(errorsx.CodeUnauthorized) + ": " + e.msg
+func (e *codedError) Error() string {
+	return string(e.code) + ": " + e.msg
 }
 
-func (e *tokenError) Unwrap() error {
-	return errorsx.New(errorsx.CodeUnauthorized, e.msg)
+func (e *codedError) Unwrap() error {
+	return errorsx.New(e.code, e.msg)
 }
 
 // Token verification sentinels. All three map to HTTP 401 through
-// pkg/errorsx/httpx; see tokenError for why they are tamper-proof.
+// pkg/errorsx/httpx; see codedError for why they are tamper-proof.
 var (
-	ErrTokenMissing error = &tokenError{msg: "auth: token missing"}
-	ErrTokenInvalid error = &tokenError{msg: "auth: token invalid"}
-	ErrTokenExpired error = &tokenError{msg: "auth: token expired"}
+	ErrTokenMissing error = &codedError{code: errorsx.CodeUnauthorized, msg: "auth: token missing"}
+	ErrTokenInvalid error = &codedError{code: errorsx.CodeUnauthorized, msg: "auth: token invalid"}
+	ErrTokenExpired error = &codedError{code: errorsx.CodeUnauthorized, msg: "auth: token expired"}
 )
 
 // ctxKey is unexported so an Identity stored here cannot collide with another
@@ -98,7 +107,7 @@ const keyIdentity ctxKey = iota
 // Identity. Transport middleware calls this after a successful Verify so
 // handlers downstream can read the principal via IdentityFromContext.
 func WithIdentity(ctx context.Context, id Identity) context.Context {
-	return context.WithValue(ctx, keyIdentity, id.clone())
+	return context.WithValue(ctx, keyIdentity, id.Clone())
 }
 
 // IdentityFromContext returns a clone of the Identity placed by WithIdentity.
@@ -109,5 +118,5 @@ func IdentityFromContext(ctx context.Context) (Identity, bool) {
 	if !ok {
 		return Identity{}, false
 	}
-	return id.clone(), true
+	return id.Clone(), true
 }

@@ -22,6 +22,36 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
+## AuthZ Contract Cycle: IN PROGRESS
+
+Branch `feat/ports-authz` (off `main` @ `f09364e`). Core adds the authorization
+counterpart to the v0.6.0 AuthN contract, in the **same `ports/auth` package**.
+Contract only — no adapter, no tag this cycle (tag-gate on the first `authz/*`
+adapter consumer in `go-ddd-adapters`, same discipline as v0.5.0 / v0.6.0).
+
+Shipped scope on the branch:
+
+- `A ports/auth/authz.go` — `Resource{Type, ID}`, `Authorizer.Allow(ctx, caller
+  Identity, action string, resource Resource) error`, `AuthorizerFunc`, sentinels
+  `ErrForbidden` (`CodeForbidden` → 403) and `ErrInvalidAuthorizationRequest`
+  (`CodeInvalidArgument` → 400, splits malformed input from policy denial).
+- `M ports/auth/auth.go` — private `tokenError{msg}` generalised to shared
+  `codedError{code, msg}` (AuthN sentinels now carry `CodeUnauthorized`
+  explicitly); private `clone()` promoted to public `Identity.Clone()`; package
+  doc updated (AuthZ no longer "out of scope").
+- `A ports/auth/authz_test.go` — 7 contract tests (func adapter allow/deny +
+  arg propagation, mandatory `httpx.Translate` 403 + 400 acceptance, both
+  sentinels tamper-proof, `%w`-wrapped still maps, direct implementation).
+- `M ports/auth/auth_test.go` — `TestIdentity_Clone_Isolates` for the public
+  `Clone`.
+- `M CHANGELOG.md` — new `[Unreleased]` section with the AuthZ `### Added` entry.
+
+Local verification on `feat/ports-authz`: `gofmt -l .` clean, `go vet ./...`,
+`go build ./...` clean, `go test ./...` PASS (all packages; AuthN
+`TestSentinels_*` still green after the `codedError`/`Clone` refactor).
+
+Design rationale recorded in `.agent/decisions.md` "AuthZ Contract".
+
 ## v0.6.0 AuthN Cycle: CLOSED
 
 Release shipped 2026-06-05. Core ships the `ports/auth` AuthN contract only;
@@ -87,7 +117,7 @@ both repos now on matching `v0.6.0` tags.
 - core `main` head: `86b1e15` `Merge pull request #10 from slam0504/release/v0.6.0-prep`
   (= the `v0.6.0` tag target; this `chore/record-v060-shipped` bookkeeping
   commit advances `main` by one merge on top — the unavoidable ±1 self-reference lag)
-- core working branch: none (`chore/record-v060-shipped` carries this bookkeeping update, then deleted)
+- core working branch: `feat/ports-authz` (AuthZ contract, off `main` @ `f09364e`; PR pending)
 - core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
 - adapters `main` head: `1b0f3ae` `Merge pull request #24 from slam0504/chore/bump-core-v0.6.0`
   (dep-bump to `go-ddd-core v0.6.0`; consumer landed earlier in PR #23 `ae76f78`)

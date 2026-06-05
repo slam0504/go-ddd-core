@@ -169,6 +169,34 @@ func TestWithIdentity_IsolatesMutation(t *testing.T) {
 	}
 }
 
+// TestIdentity_Clone_Isolates guards the public Clone helper used by adapters
+// that need to retain an Identity beyond a borrowed call (e.g. Authorizer.Allow,
+// async audit). Mutating the clone's Roles/Claims must not reach the original,
+// and a zero Identity must round-trip to a zero Identity (nil preserved).
+func TestIdentity_Clone_Isolates(t *testing.T) {
+	orig := auth.Identity{
+		Subject: "user-1",
+		Roles:   []string{"admin"},
+		Claims:  map[string]any{"scope": "read"},
+	}
+	clone := orig.Clone()
+
+	clone.Roles[0] = "tampered"
+	clone.Claims["scope"] = "tampered"
+
+	if orig.Roles[0] != "admin" {
+		t.Errorf("clone mutation leaked into original Roles: %v", orig.Roles)
+	}
+	if orig.Claims["scope"] != "read" {
+		t.Errorf("clone mutation leaked into original Claims: %v", orig.Claims)
+	}
+
+	zero := auth.Identity{}.Clone()
+	if zero.Roles != nil || zero.Claims != nil {
+		t.Errorf("zero Identity Clone() = %+v, want nil Roles/Claims", zero)
+	}
+}
+
 // staticVerifier confirms the contract is open to direct implementation, not
 // only the TokenVerifierFunc convenience path.
 type staticVerifier struct {
