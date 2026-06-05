@@ -6,7 +6,10 @@ origin; `gh api repos/.../releases/latest` returns `v0.6.0`, GitHub Release
 published as Latest at
 https://github.com/slam0504/go-ddd-core/releases/tag/v0.6.0. Release-prep
 PR #10 merged `86b1e15` after CI green; local `gofmt -l`/`go build`/`go test`
-clean at the pre-merge tip `2c4d0a8`.
+clean at the pre-merge tip `2c4d0a8`. Adapter side synced 2026-06-05 via
+read-only `gh`: `go-ddd-adapters` PR #24 dep-bump (`1b0f3ae`) on `go-ddd-core
+v0.6.0`, adapters `v0.6.0` tag (`a9d4bfb`) + Release Latest — both repos on
+matching `v0.6.0`.
 Source: core verified via `git log` on `main` @ `e2ee2bb` (merge of PR #7
 release/v0.5.0-prep), `git ls-remote --tags origin v0.5.0` returning
 `543cbf3 refs/tags/v0.5.0`, `gh release view v0.5.0` confirming Latest,
@@ -63,10 +66,13 @@ Out of scope (deferred to v0.6.x): authorization (role/permission checks,
 The `v0.6.0` tag is on proxy.golang.org once `go get` fetches it. Treat it as
 a permanent published version.
 
-Adapter follow-up (adapter agent's responsibility, separate repo): bump
-`go-ddd-adapters`' `go-ddd-core` dependency from the `core@main` pseudo-version
-to the tagged `v0.6.0`, then tag adapters' own release — the same 2-step
-cross-repo close used for v0.5.0.
+Cross-repo close — **DONE 2026-06-05** (synced from the adapter session via
+read-only `gh`): `go-ddd-adapters` PR #24 (`chore(release): bump go-ddd-core to
+v0.6.0`) merged `1b0f3ae`; adapters `go.mod` now pins `go-ddd-core v0.6.0`
+(was the `core@main` pseudo-version used by the PR #23 consumer). Adapters
+`v0.6.0` tag (`a9d4bfb` → `1b0f3ae`) pushed and GitHub Release published as
+**Latest** 2026-06-05 04:17Z. Same 2-step cross-repo close used for v0.5.0;
+both repos now on matching `v0.6.0` tags.
 
 ## v0.3.0 Release Cycle: CLOSED
 
@@ -83,10 +89,9 @@ cross-repo close used for v0.5.0.
   commit advances `main` by one merge on top — the unavoidable ±1 self-reference lag)
 - core working branch: none (`chore/record-v060-shipped` carries this bookkeeping update, then deleted)
 - core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
-- adapters `main` head: `3dac600` (post-release bookkeeping on top of
-  PR #22 merge at `45274dd`, which bumped `go-ddd-core` from the
-  `core@main` pseudo-version to the tagged `v0.5.0`)
-- adapters latest tag: `v0.5.0` at `45274dd` (annotated tag object `a02f6d4`)
+- adapters `main` head: `1b0f3ae` `Merge pull request #24 from slam0504/chore/bump-core-v0.6.0`
+  (dep-bump to `go-ddd-core v0.6.0`; consumer landed earlier in PR #23 `ae76f78`)
+- adapters latest tag: `v0.6.0` at `a9d4bfb` (→ `1b0f3ae`); prior `v0.5.0` at `45274dd` (object `a02f6d4`)
 - Merged feature branches deleted from origin and locally:
   - `release/v0.3.0-prep` (core)
   - `release/v0.3.0-bump` (adapters)
