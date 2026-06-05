@@ -22,14 +22,16 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## AuthZ Contract Cycle: IN PROGRESS
+## AuthZ Contract Cycle: CONTRACT MERGED
 
-Branch `feat/ports-authz` (off `main` @ `f09364e`). Core adds the authorization
+Merged 2026-06-05 via PR #13 (`feat/ports-authz`, CI green + Codex no findings),
+merge commit `64b6bf6` on top of `ef08343`. Core adds the authorization
 counterpart to the v0.6.0 AuthN contract, in the **same `ports/auth` package**.
-Contract only — no adapter, no tag this cycle (tag-gate on the first `authz/*`
+Contract only — no adapter, **no tag yet** (tag-gate on the first `authz/*`
 adapter consumer in `go-ddd-adapters`, same discipline as v0.5.0 / v0.6.0).
+CHANGELOG entry stays under `[Unreleased]` until that release-prep.
 
-Shipped scope on the branch:
+Shipped scope (now on `main`):
 
 - `A ports/auth/authz.go` — `Resource{Type, ID}`, `Authorizer.Allow(ctx, caller
   Identity, action string, resource Resource) error`, `AuthorizerFunc`, sentinels
@@ -114,10 +116,10 @@ both repos now on matching `v0.6.0` tags.
 
 ## Current Branch / Heads
 
-- core `main` head: `86b1e15` `Merge pull request #10 from slam0504/release/v0.6.0-prep`
-  (= the `v0.6.0` tag target; this `chore/record-v060-shipped` bookkeeping
-  commit advances `main` by one merge on top — the unavoidable ±1 self-reference lag)
-- core working branch: `feat/ports-authz` (AuthZ contract, off `main` @ `f09364e`; PR pending)
+- core `main` head: `64b6bf6` `Merge pull request #13 from slam0504/feat/ports-authz`
+  (AuthZ contract; this `chore/sync-authz-merged` bookkeeping commit advances
+  `main` by one merge on top — the unavoidable ±1 self-reference lag)
+- core working branch: `chore/sync-authz-merged` (state sync after PR #13 merge)
 - core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
 - adapters `main` head: `1b0f3ae` `Merge pull request #24 from slam0504/chore/bump-core-v0.6.0`
   (dep-bump to `go-ddd-core v0.6.0`; consumer landed earlier in PR #23 `ae76f78`)
