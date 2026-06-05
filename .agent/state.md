@@ -1,6 +1,20 @@
 # go-ddd-core State
 
-Last verified: 2026-06-05 Asia/Taipei (v0.6.0 AuthN cycle CLOSED — tag shipped).
+Last verified: 2026-06-05 Asia/Taipei (v0.7.0 AuthZ core tag shipped; adapter
+dep-bump + tag delegated to the adapter session).
+
+v0.7.0 (AuthZ): annotated tag `v0.7.0` (object `c4a4dc1` → merge commit
+`3729add`, release-prep PR #15) pushed to origin; `gh api
+repos/.../releases/latest` returns `v0.7.0`, GitHub Release published as Latest
+at https://github.com/slam0504/go-ddd-core/releases/tag/v0.7.0. Local `gofmt -l`/
+`go vet`/`go build`/`go test ./...` clean before merge. **Adapter side NOT done
+by this session** — `go-ddd-adapters` still pins core at pseudo-version
+`v0.6.1-0.20260605060735-47e02fa632a8` and must bump to `v0.7.0` (root +
+`examples/orders` go.mod, `go mod tidy`), then cut its own tag/Release; handed to
+the adapter session per spec §10 steps 3–4. Until then the two repos are NOT on
+matching tags.
+
+Prior — v0.6.0 (AuthN cycle CLOSED — tag shipped).
 `v0.6.0` annotated tag (object `fd596cd` → merge commit `86b1e15`) pushed to
 origin; `gh api repos/.../releases/latest` returns `v0.6.0`, GitHub Release
 published as Latest at
@@ -22,7 +36,7 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## AuthZ Contract Cycle: RELEASE-PREP (v0.7.0)
+## AuthZ Contract Cycle: CORE TAG SHIPPED (v0.7.0) — adapter side pending
 
 Contract merged 2026-06-05 via PR #13 (`feat/ports-authz`, CI green + Codex no
 findings), merge commit `64b6bf6` on top of `ef08343`; state sync PR #14
@@ -33,11 +47,19 @@ Tag gate **satisfied** 2026-06-05 by the first consumer — `go-ddd-adapters`
 PR #25 `auth/casbin` Authorizer adapter (Phase A), merged pinning core at
 pseudo-version `47e02fa`. Version resolved to **v0.7.0** (AuthZ adds exported
 API → semver minor from v0.6.0; independent of the closed v0.6.0 AuthN cycle).
-This release-prep moves the CHANGELOG entry from `[Unreleased]` to
-`[0.7.0] - 2026-06-05`, updates the README `auth/` row to `[v0.7.0]`, and marks
-the decisions.md tag gate satisfied. Tag + GitHub Release + adapter dep-bump
-follow after this PR merges (recorded in a bookkeeping sync), same cross-repo
-ritual as v0.5.0 / v0.6.0.
+Release-prep PR #15 (merge `3729add`) moved the CHANGELOG entry from
+`[Unreleased]` to `[0.7.0] - 2026-06-05`, updated the README `auth/` row to
+`[v0.7.0]`, and marked the decisions.md tag gate satisfied. **Core tag shipped**:
+`v0.7.0` annotated tag (object `c4a4dc1` → `3729add`) pushed, GitHub Release
+published as Latest.
+
+**Remaining (delegated to the adapter session, NOT this one)** — spec §10
+steps 3–4: bump `go-ddd-adapters` core dep from pseudo-version
+`v0.6.1-0.20260605060735-47e02fa632a8` to `v0.7.0` (root + `examples/orders`
+go.mod/go.sum, `go mod tidy`); CI green merge; then annotate + push the adapters
+`v0.7.0` tag (new `auth/casbin` package → semver minor) and open its GitHub
+Release. The cross-repo cycle is CLOSED only once that lands and both repos read
+matching `v0.7.0`.
 
 Shipped scope (now on `main`):
 
@@ -124,11 +146,11 @@ both repos now on matching `v0.6.0` tags.
 
 ## Current Branch / Heads
 
-- core `main` head: `47e02fa` `Merge pull request #14 from slam0504/chore/sync-authz-merged`
-  (AuthZ state sync; this `release/v0.7.0-prep` branch will advance `main` by one
-  merge on top, which becomes the `v0.7.0` tag target)
-- core working branch: `release/v0.7.0-prep` (CHANGELOG→[0.7.0], README/decisions, awaiting tag)
-- core latest tag: `v0.6.0` at `86b1e15` (annotated tag object `fd596cd`); v0.7.0 pending this release-prep; prior `v0.5.0` at `e2ee2bb` (object `543cbf3`)
+- core `main` head: `3729add` `Merge pull request #15 from slam0504/release/v0.7.0-prep`
+  (= the `v0.7.0` tag target; this `chore/record-v070-shipped` bookkeeping commit
+  advances `main` by one merge on top — the unavoidable ±1 self-reference lag)
+- core working branch: `chore/record-v070-shipped` (record v0.7.0 tag shipped)
+- core latest tag: `v0.7.0` at `3729add` (annotated tag object `c4a4dc1`); prior `v0.6.0` at `86b1e15` (object `fd596cd`); `v0.5.0` at `e2ee2bb` (object `543cbf3`)
 - adapters `main` head: `1b0f3ae` `Merge pull request #24 from slam0504/chore/bump-core-v0.6.0`
   (dep-bump to `go-ddd-core v0.6.0`; consumer landed earlier in PR #23 `ae76f78`)
 - adapters latest tag: `v0.6.0` at `a9d4bfb` (→ `1b0f3ae`); prior `v0.5.0` at `45274dd` (object `a02f6d4`)
