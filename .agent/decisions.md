@@ -83,5 +83,7 @@ resolution are deliberately out (see `docs/roadmap.md` v0.6.0 / v0.6.x).
   calling `Verify` (e.g. no Authorization header); a verifier invoked with an
   empty token should also return it, so behaviour stays consistent across
   adapters.
-- **Tag gate**: the contract ships unreleased; the v0.6.0 tag waits for the
-  first adapter consumer, the same discipline used for v0.5.0.
+- **Tag gate** (satisfied 2026-06-05): the contract shipped unreleased until
+  the first adapter consumer landed — `auth/jwt` + HTTP middleware in
+  `go-ddd-adapters` PR #23 (merged `ae76f78`). `v0.6.0` was then cut, the same
+  discipline used for v0.5.0.

@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-06-05
+
+AuthN contract cycle. Core ships the authentication contract only — who the
+caller is (`Identity`) and how a bearer token is verified (`TokenVerifier`).
+The first consumer — an `auth/jwt` verifier plus HTTP bearer-token middleware —
+lives in `go-ddd-adapters` (`go-ddd-adapters` PR #23, merged at `ae76f78`).
+Authorization (role/permission checks, 403) and token issuance stay out of
+core, deferred to v0.6.x.
 
 ### Added
 
@@ -29,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Authorization (role/permission checks, 403), token issuance, and the JWT
   verifier adapter are out of scope here (see `docs/roadmap.md` v0.6.0). Core
   ships only the contract; the first consumer (an `auth/jwt` adapter + HTTP
-  middleware in `go-ddd-adapters`) gates the release tag.
+  middleware in `go-ddd-adapters`) gated this release.
 
 ## [0.5.0] - 2026-05-25
 
