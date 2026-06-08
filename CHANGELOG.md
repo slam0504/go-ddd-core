@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ports/idempotency` inbound-request idempotency contract (distinct from
+  `eventbus.Inbox`, which is broker-side event dedup). Guards a non-idempotent
+  operation — typically an HTTP POST — against duplicate execution when a client
+  retries with the same idempotency key. Core ships only the contract; the
+  enforcement middleware, key/fingerprint extraction, response (de)serialization,
+  and concrete backings (in-memory / Redis / SQL) live in adapters.
+  - `idempotency.Store` interface:
+    - `Begin(ctx, scope, key, fingerprint string) (Reservation, error)` —
+      atomically reserves `(scope, key)` for a new execution or reports the
+      existing state. `scope` is a trusted, adapter-built isolation prefix
+      (isolating at least tenant and operation/endpoint), never taken from the
+      client; the same `key` under a different `scope` is an independent record.
+      `fingerprint` identifies the request payload; a stored entry whose
+      fingerprint differs yields `StatusMismatch`.
+    - `Finish(ctx, reservation, response []byte) error` /
+      `Cancel(ctx, reservation) error` — authorized only by the reservation's
+      `LeaseToken`. Three-way error: `nil` = applied for certain;
+      `errorsx.CodeConflict` (→ HTTP 409) = NOT applied for certain
+      (stale/expired/terminal); any other error = indeterminate, recover by
+      re-issuing `Begin`.
+  - `idempotency.Status` (`StatusUnknown` zero value → fail-closed, `StatusNew`,
+    `StatusInProgress`, `StatusCompleted`, `StatusMismatch`) returned as data, so
+    middleware maps normal outcomes itself; only "state undeterminable" travels
+    the `error` channel as a coded `errorsx` value through the existing
+    `pkg/errorsx/httpx` mapping (no new mapping added).
+  - `idempotency.Reservation` (`Scope`, `Key`, `LeaseToken`,
+    `LeaseTTL time.Duration` advisory budget, `Status`, `Response []byte`
+    opaque complete replay encoding). `Finish`/`Cancel` read only
+    `Scope`/`Key`/`LeaseToken`; a caller cannot extend a lease or forge ownership
+    by mutating the returned struct.
+  - `ports/idempotency/idempotencytest` exported conformance helpers:
+    `RunStoreContract(t, factory)` (transport-neutral deterministic state
+    machine) and the opt-in `RunReclaimContract(t, factory, ReclaimOptions{ReclaimWithin})`
+    (eventual-reclaim liveness MUST, driven by the adapter-declared bound).
+  - Unreleased pending the tag gate: the version is cut once the first adapter
+    consumer (in-memory / Redis Store in `go-ddd-adapters`) lands and runs both
+    conformance helpers — same discipline used for v0.5.0–v0.7.0.
+
 ## [0.7.0] - 2026-06-05
 
 AuthZ contract. Core adds the authorization counterpart to the v0.6.0 AuthN
