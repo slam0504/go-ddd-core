@@ -155,3 +155,132 @@ issuance stay out of core.
   minor bump from v0.6.0, and v0.7.0 stays independent of the closed v0.6.0 AuthN
   cycle (v0.6.x reserved for AuthN/JWT/Bearer fixes). `v0.7.0` was then cut, the
   same discipline used for v0.5.0 / v0.6.0.
+
+## Inbound Request Idempotency Contract (`ports/idempotency`, post-v0.7.0)
+
+Added on branch `feat/ports-idempotency` 2026-06-08. Scope: guard a non-idempotent
+inbound request (typically an HTTP POST) against duplicate execution when a client
+retries the same idempotency key. **Distinct from `eventbus.Inbox`** (above, "Event
+Idempotency"): Inbox dedups broker-delivered domain events per consumer
+(`InboxKey{Consumer, EventID}`); this contract guards inbound request retries keyed
+by an adapter-built scope + client key + request fingerprint, with lease-tracked
+reservation ownership. Core ships the contract + an exported conformance suite only;
+enforcement middleware, key/fingerprint extraction, response (de)serialization, and
+concrete backings (in-memory / Redis / SQL) live in adapters.
+
+- **Dedicated `Store` contract, not "just use `ports/cache`".** Correct idempotency
+  needs an *atomic claim (reserve) + lease lifecycle*. A `cache.Exists`-then-`cache.Set`
+  has a TOCTOU race (two concurrent retries both read "unseen" → both execute) and
+  cannot express reservation ownership. `Begin` folds "atomically reserve or report
+  existing state" into one call; atomicity + lease validation are the adapter's job
+  (Redis SETNX+lease, SQL unique, in-memory mutex). Refines the `docs/roadmap.md`
+  shorthand "can reuse `ports/cache` as backing".
+- **`Begin(ctx, scope, key, fingerprint)` carries a trusted `scope`.** `scope` is an
+  adapter/middleware-built isolation prefix (isolating **at least** tenant and
+  operation/endpoint), **never taken from the client**; `key` is the raw client
+  idempotency key. Same `key` under a different `scope` is a fully independent record;
+  `fingerprint` does **not** substitute for `scope` (an identical payload could
+  otherwise replay across tenants). Putting scope in the signature is harder to get
+  wrong than asking each caller to pre-concatenate an opaque key, and avoids
+  string-concat collisions — guarded by the suite's tuple-separation case
+  (`("tenant:op","k")` vs `("tenant","op:k")` must be two records).
+- **Normal outcomes are data (`Status` enum), not sentinels.** `Begin` returns
+  `(Reservation, error)`: `StatusNew`/`InProgress`/`Completed`/`Mismatch` are the
+  caller's switch; only "state undeterminable" travels the `error` channel as a coded
+  `errorsx` value. No sentinel, no `codedError` wrapper (honest divergence from auth)
+  — `Store` is a 3-method interface so there is also **no `StoreFunc`** (func-adapters
+  fit single-method contracts only). `StatusUnknown` is the **zero value** so a bug
+  returning `Reservation{}` fails closed (never executes) instead of looking like a
+  successful new reservation.
+- **Lease is a relative advisory `LeaseTTL time.Duration`, not absolute
+  `LeaseExpiresAt time.Time`.** Absolute time would invite the caller to compare its
+  local clock against a Redis/SQL/remote backend clock (skew + base unreliable). The
+  honest promise is "roughly this much processing budget left", tracked by the caller's
+  own monotonic clock. `LeaseTTL <= 0` = adapter exposes no observable budget; it does
+  **NOT** mean never-expires. Whether a `Finish` still applies is decided by the Store
+  validating the lease token, **not** by the caller comparing TTLs. The lease token
+  blocks "stale handler overwrites a newer reservation after key reuse"; it cannot stop
+  "stale handler already committed an external side effect" — so **no exactly-once
+  guarantee for side effects**, and **no `Renew`/`Extend` in v1** (would drag
+  heartbeats / renew-failure handling into core).
+- **`Finish`/`Cancel` errors are three-way, not a "non-nil = not applied" flatten.**
+  `nil` = applied for certain; `errorsx.CodeConflict` (→409) = NOT applied for certain
+  (stale/expired/terminal — a *decided* rejection); **any other error
+  (`CodeUnavailable`/timeout/ctx) = INDETERMINATE** (a remote store may have committed
+  then lost the ACK). The caller MUST NOT assume "not applied"; it recovers by
+  re-issuing `Begin` (same scope/key/fingerprint) to read the authoritative state.
+  **No read-only query method** — it would overlap `Begin`'s authoritative read and
+  re-introduce TOCTOU (`Begin` is already the atomic "read + reserve-if-needed" entry).
+  Stale/expired/terminal **all** return `CodeConflict` (one code, so adapters don't
+  diverge on HTTP behaviour — an earlier draft allowed `CodeConflict`/`CodeNotFound`).
+- **`Cancel` is narrowed: release only when sure no observable side effect committed.**
+  On an ambiguous failure, leave the reservation standing (let the adapter reclaim it)
+  rather than `Cancel`, so a retry does not re-run a partially-applied operation.
+  `Cancel` must NOT delete an already-completed payload (completed is terminal).
+- **`Response` is opaque `[]byte` but must be a complete replay encoding.** The Store
+  stores/returns bytes verbatim, never parsing — so the contract works for
+  gRPC/GraphQL/command, not just HTTP. The contract *requires* the consumer to encode a
+  faithfully replayable result (HTTP: status + the headers needed to replay + body, not
+  body alone). **Core defines no transport record schema** (which headers, encoding,
+  versioning are an adapter concern). `Response == nil`/empty on `StatusCompleted` is a
+  legal empty response (e.g. HTTP 204), not lost data; `StatusMismatch` must never leak
+  a stored payload.
+- **Reservation field trust boundary (security-critical).** `Finish`/`Cancel` read
+  **only** `Scope`, `Key`, `LeaseToken` from the passed-in `Reservation` (lookup keys +
+  ownership credential); the mutable `Status`/`LeaseTTL`/`Response` are untrusted. A
+  caller cannot extend a lease or forge ownership by mutating the returned struct. This
+  is a **hard** adapter requirement, guarded by the suite's forged-token / tampered-field
+  cases (tamper `LeaseTTL`/`Status`/`Response` → `Finish` still succeeds; only forging
+  `LeaseToken` flips to `CodeConflict`).
+- **ctx cancellation is part of the error contract.** All three methods must `%w`-wrap
+  the cause so `errors.Is(err, context.Canceled)` / `context.DeadlineExceeded` holds;
+  a cancelled `Begin` must not silently return `StatusNew`, a cancelled `Finish` must
+  not silently count as applied. This is deterministically testable (pass an
+  already-cancelled / already-past-deadline ctx, zero wait) → it lives in the exported
+  suite, not local-only.
+- **Eventual-reclaim liveness is a core MUST, with enforced verification.** An
+  unfinished in-progress reservation must *eventually* become re-`Begin`-able (else a
+  handler crash / dropped connection / ambiguous Cancel blocks the key forever). This
+  guarantees **key liveness only, NOT side-effect exactly-once**. The exact reclaim
+  delay/precision and completed-record retention are adapter policy (backend TTL
+  precision, cleanup, clock, latency) — so they stay **out** of the deterministic
+  `RunStoreContract` (which would turn flaky). Verification is **not** a verbal MUST:
+  an opt-in exported `RunReclaimContract(t, factory, ReclaimOptions{ReclaimWithin})`
+  holds the store to **exactly** the adapter-**declared** `ReclaimWithin` (real
+  wait/poll, deadline anchored at reservation creation, poll capped so enforcement
+  stays tight), *not* a value derived from `LeaseTTL` nor an injected `advance` clock
+  (an injected clock is easy to wire to a false green and forces unnatural internal
+  hooks). The suite adds **no margin of its own** — the adapter must bake any
+  scheduling jitter into the value it declares (e.g. declare 80ms while actually
+  reclaiming at 20ms). A **non-positive** `ReclaimWithin` **fails** the suite (an
+  adapter with no time-based reclaim simply does not call this helper, but the
+  liveness MUST still requires a documented reclaim policy). Earlier draft skipped on
+  zero and waited `2x + 500ms`; that let an adapter declaring 40ms but reclaiming at
+  500ms pass, defeating "the adapter declares the bound" — removed.
+- **Conformance suite ships now, but enforces only the deterministic state machine.**
+  This is a stateful (state machine + lease ownership + Cancel + mismatch + replay)
+  contract; a `_test.go`-local fake would only prove "our fake matches our test" and
+  bind no future Redis/SQL adapter. So core exports
+  `idempotencytest.RunStoreContract(t, factory)` — **transport-neutral**: it imports
+  only `pkg/errorsx` and asserts `errorsx.CodeOf(err) == CodeConflict`, never an HTTP
+  status (because `httpx.Translate` maps both `CodeConflict` and `CodeAlreadyExists` to
+  409, so a status assertion couldn't prove the contract code). The errorsx→HTTP
+  mapping (400/409/503) is verified once, in core's own local unit test (the only
+  `httpx` importer). Time-dependent expiry/retention is out (adapter policy);
+  reclaim has its own opt-in helper above.
+- **Core ships the contract + conformance helpers only** — no in-memory / Redis / SQL
+  Store in core (`idempotencytest`'s `fakeStore` lives in `_test.go`, not a production
+  path). Matches the v0.5.0–v0.7.0 minimalism.
+- **Tag gate** (not yet satisfied): the contract is **unreleased** until the first
+  adapter consumer (in-memory / Redis Store in `go-ddd-adapters`) lands. Expected
+  **v0.8.0** (adds exported API → semver minor; v0.7.x reserved for AuthZ fixes).
+  Acceptance criteria the adapter cycle must meet at release-prep:
+  (a) `RunStoreContract` green against the real Store;
+  (b) `RunReclaimContract` run with the adapter's declared `ReclaimWithin` + the
+  adapter docs declaring its TTL/cleanup policy;
+  (c) middleware intent tests — both 409 paths (`StatusInProgress`, `StatusMismatch`),
+  `StatusUnknown`→500 (fail-closed), full `StatusCompleted` replay (status + headers +
+  body, no handler re-run), `StatusMismatch` non-leak, and the error channel
+  (`CodeInvalidArgument`→400 / `CodeUnavailable`→503). These are written into the
+  contract docs now so the reclaim MUST and the middleware mapping/replay are not left
+  unverified when the adapter lands.

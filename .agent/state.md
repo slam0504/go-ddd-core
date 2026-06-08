@@ -1,7 +1,12 @@
 # go-ddd-core State
 
-Last verified: 2026-06-05 Asia/Taipei (v0.7.0 AuthZ core tag shipped; adapter
-dep-bump + tag delegated to the adapter session).
+Last verified: 2026-06-08 Asia/Taipei (`ports/idempotency` contract + conformance
+suite on `feat/ports-idempotency`; **PR #17 open** against `main`, CI green; review
+Medium finding fixed — `RunReclaimContract` now enforces the exact declared
+`ReclaimWithin` and fails on a non-positive value; local gofmt/vet/build/`go test
+-race` green; **NO tag** — tag-gate awaits first adapter consumer). Prior: 2026-06-05
+(v0.7.0 AuthZ core tag shipped; adapter dep-bump + tag delegated to the adapter
+session).
 
 v0.7.0 (AuthZ): annotated tag `v0.7.0` (object `c4a4dc1` → merge commit
 `3729add`, release-prep PR #15) pushed to origin; `gh api
@@ -35,6 +40,60 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 `a02f6d4` → `45274dd`) pushed, GitHub Release published as Latest
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
+
+## Idempotency Contract Cycle: PR #17 OPEN — NO tag
+
+Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
+(`ports/idempotency`). Branch `feat/ports-idempotency` off `main` @ `288d3b6`.
+**Core contract + exported conformance suite only** — no adapter, no middleware,
+**no tag** this cycle (tag-gate: the version, expected **v0.8.0** since it adds
+exported API, is cut once the first adapter consumer lands; v0.7.x stays reserved
+for AuthZ fixes).
+
+Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17, branch
+`feat/ports-idempotency` → `main`, not yet merged):
+
+- `A ports/idempotency/idempotency.go` — `Store` (`Begin(ctx, scope, key,
+  fingerprint)`/`Finish`/`Cancel`), `Reservation{Scope, Key, LeaseToken,
+  LeaseTTL, Status, Response}`, `Status` enum (`StatusUnknown` zero → fail-closed,
+  `New`/`InProgress`/`Completed`/`Mismatch`) + `String()`. Imports only `context`,
+  `time` — no transport/infra, errorsx referenced in doc comments only.
+- `A ports/idempotency/idempotencytest/idempotencytest.go` — exported,
+  transport-neutral conformance suite: `RunStoreContract(t, factory)` (deterministic
+  state machine, lease ownership, tuple-separation, fingerprint mismatch, copy
+  semantics, malformed input, true-concurrency atomic claim, deterministic ctx
+  cancellation) asserting `errorsx.CodeOf` (never HTTP status); opt-in
+  `RunReclaimContract(t, factory, ReclaimOptions{ReclaimWithin})` for the
+  eventual-reclaim liveness MUST. Real-wait, deadline anchored at reservation
+  creation and held to **exactly** the adapter-declared bound (no suite margin;
+  adapter bakes in jitter); a **non-positive** `ReclaimWithin` **fails** (not skips).
+- `A ports/idempotency/idempotencytest/idempotencytest_test.go` — `_test.go`-local
+  mutex-backed `fakeStore` (struct composite key, lease tokens, three states,
+  fingerprint, internal `reclaimAfter`) fed into both `RunStoreContract`
+  (`reclaimAfter` 0 = never reclaim) and `RunReclaimContract` (fake reclaims at 20ms,
+  declares 80ms — modelling an adapter that beats its promised bound), proving both
+  suites pass against a correct implementation.
+- `A ports/idempotency/idempotency_test.go` — local units: `Status.String()`,
+  `StatusUnknown` zero value, and the **only** `httpx` importer
+  (`CodeInvalidArgument`→400 / `CodeConflict`→409 / `CodeUnavailable`→503).
+- `M CHANGELOG.md` — `[Unreleased]` `### Added` (note tag-gate, unreleased).
+- `M README.md` — `ports/` parenthetical + `idempotency/` sub-row (no version
+  bracket yet, per tag-gate).
+- `M docs/roadmap.md` — surgical: A-quadrant idempotency row marked
+  "✅ contract shipped (unreleased, tag-gate)".
+- `M .agent/decisions.md` — "Idempotency Contract" decision section.
+
+Local verification on `feat/ports-idempotency`: `gofmt -l ports/idempotency/`
+clean, `go vet ./ports/idempotency/...`, `go build ./...` clean,
+`go test -race ./ports/idempotency/...` PASS (incl. reclaim subtest run, not
+skipped), `go test ./...` PASS (no regressions).
+
+**Tag-gate acceptance criteria** (recorded for the future adapter cycle — see
+decisions.md): the first adapter consumer must (a) run `RunStoreContract` green,
+(b) run `RunReclaimContract` declaring its own `ReclaimWithin` + document its
+TTL/cleanup policy, (c) ship middleware intent tests (both 409 paths,
+`StatusUnknown`→500 fail-closed, full `StatusCompleted` replay, `StatusMismatch`
+non-leak, error-channel 400/503).
 
 ## AuthZ Contract Cycle: CORE TAG SHIPPED (v0.7.0) — adapter side pending
 
@@ -146,10 +205,10 @@ both repos now on matching `v0.6.0` tags.
 
 ## Current Branch / Heads
 
-- core `main` head: `3729add` `Merge pull request #15 from slam0504/release/v0.7.0-prep`
-  (= the `v0.7.0` tag target; this `chore/record-v070-shipped` bookkeeping commit
-  advances `main` by one merge on top — the unavoidable ±1 self-reference lag)
-- core working branch: `chore/record-v070-shipped` (record v0.7.0 tag shipped)
+- core `main` head: `288d3b6` `Merge pull request #16 from slam0504/chore/record-v070-shipped`
+  (one merge past the `v0.7.0` tag target `3729add` — the bookkeeping commit that
+  recorded the v0.7.0 tag shipped)
+- core working branch: `feat/ports-idempotency` (ports/idempotency contract; off `288d3b6`)
 - core latest tag: `v0.7.0` at `3729add` (annotated tag object `c4a4dc1`); prior `v0.6.0` at `86b1e15` (object `fd596cd`); `v0.5.0` at `e2ee2bb` (object `543cbf3`)
 - adapters `main` head: `1b0f3ae` `Merge pull request #24 from slam0504/chore/bump-core-v0.6.0`
   (dep-bump to `go-ddd-core v0.6.0`; consumer landed earlier in PR #23 `ae76f78`)
