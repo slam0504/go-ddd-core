@@ -1,12 +1,11 @@
 # go-ddd-core State
 
 Last verified: 2026-06-08 Asia/Taipei (`ports/idempotency` contract + conformance
-suite on `feat/ports-idempotency`; **PR #17 open** against `main`, CI green; review
-Medium finding fixed — `RunReclaimContract` now enforces the exact declared
-`ReclaimWithin` and fails on a non-positive value; local gofmt/vet/build/`go test
--race` green; **NO tag** — tag-gate awaits first adapter consumer). Prior: 2026-06-05
-(v0.7.0 AuthZ core tag shipped; adapter dep-bump + tag delegated to the adapter
-session).
+suite **merged to `main`** via PR #17 — merge commit `0e1292d`, CI green; review
+Medium finding fixed pre-merge — `RunReclaimContract` now enforces the exact declared
+`ReclaimWithin` and fails on a non-positive value; **NO tag** — tag-gate awaits first
+adapter consumer). Prior: 2026-06-05 (v0.7.0 AuthZ core tag shipped; adapter dep-bump
++ tag delegated to the adapter session).
 
 v0.7.0 (AuthZ): annotated tag `v0.7.0` (object `c4a4dc1` → merge commit
 `3729add`, release-prep PR #15) pushed to origin; `gh api
@@ -41,7 +40,7 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Idempotency Contract Cycle: PR #17 OPEN — NO tag
+## Idempotency Contract Cycle: MERGED to main (PR #17) — NO tag
 
 Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 (`ports/idempotency`). Branch `feat/ports-idempotency` off `main` @ `288d3b6`.
@@ -50,8 +49,8 @@ Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 exported API, is cut once the first adapter consumer lands; v0.7.x stays reserved
 for AuthZ fixes).
 
-Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17, branch
-`feat/ports-idempotency` → `main`, not yet merged):
+Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17 MERGED, merge commit
+`0e1292d`; branch `feat/ports-idempotency` deleted):
 
 - `A ports/idempotency/idempotency.go` — `Store` (`Begin(ctx, scope, key,
   fingerprint)`/`Finish`/`Cancel`), `Reservation{Scope, Key, LeaseToken,
