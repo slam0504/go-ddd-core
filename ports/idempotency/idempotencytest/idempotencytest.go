@@ -437,26 +437,31 @@ func RunStoreContract(t *testing.T, newStore StoreFactory) {
 	})
 }
 
-// ReclaimOptions carries the adapter-declared bound the reclaim suite waits on.
+// ReclaimOptions carries the adapter-declared bound the reclaim suite enforces.
 type ReclaimOptions struct {
 	// ReclaimWithin is the adapter's promise that an unfinished in-progress
-	// reservation becomes re-Begin-able within this duration. The suite waits
-	// (and polls) up to this bound rather than deriving timing from LeaseTTL or
-	// injecting a clock. Zero skips the time-based reclaim suite.
+	// reservation becomes re-Begin-able within this duration of being created.
+	// The suite polls up to exactly this bound and adds no margin of its own, so
+	// the adapter must bake any scheduling jitter into the declared value. It
+	// must be positive; the suite does not derive timing from LeaseTTL or inject
+	// a clock.
 	ReclaimWithin time.Duration
 }
 
 // RunReclaimContract verifies the liveness MUST: an unfinished reservation is
 // eventually reclaimed so the same (scope, key) can be reserved again. It is
 // opt-in and time-based — kept out of RunStoreContract so the deterministic
-// suite stays zero-wait. An adapter declares its own ReclaimWithin; the suite
-// trusts that declaration instead of inspecting the store's clock. When
-// ReclaimWithin is zero the suite skips, but a production adapter must still
-// document a reclaim policy.
+// suite stays zero-wait. The adapter declares its own ReclaimWithin (with jitter
+// baked in) and the suite holds the store to exactly that bound instead of
+// inspecting the store's clock. A non-positive ReclaimWithin fails the suite: an
+// adapter with no time-based reclaim simply does not call this helper, but the
+// liveness MUST still requires it to document a reclaim policy.
 func RunReclaimContract(t *testing.T, newStore StoreFactory, opts ReclaimOptions) {
 	t.Helper()
 	if opts.ReclaimWithin <= 0 {
-		t.Skip("idempotencytest: ReclaimWithin not declared; skipping time-based reclaim contract")
+		t.Fatalf("idempotencytest: ReclaimOptions.ReclaimWithin must be positive, got %v; "+
+			"an adapter without time-based reclaim should not call RunReclaimContract "+
+			"(but must still document a reclaim policy)", opts.ReclaimWithin)
 	}
 
 	t.Run("UnfinishedReservationEventuallyReclaimable", func(t *testing.T) {
@@ -464,12 +469,15 @@ func RunReclaimContract(t *testing.T, newStore StoreFactory, opts ReclaimOptions
 		ctx := context.Background()
 		const scope, key = "tenant:op", "k"
 
+		// Anchor the bound at reservation creation: the adapter promised reclaim
+		// within ReclaimWithin of this point, jitter already baked in. The suite
+		// holds it to exactly that bound and adds no margin.
+		start := time.Now()
 		res1 := beginChecked(t, store, scope, key, testFingerprint)
 		requireStatus(t, res1, idempotency.StatusNew)
 		// Simulate a crash: never Finish or Cancel res1.
 
-		// Generous bound so scheduling jitter does not flake the test.
-		deadline := time.Now().Add(opts.ReclaimWithin*2 + 500*time.Millisecond)
+		deadline := start.Add(opts.ReclaimWithin)
 		poll := max(opts.ReclaimWithin/10, 2*time.Millisecond)
 
 		var res2 idempotency.Reservation
@@ -482,10 +490,12 @@ func RunReclaimContract(t *testing.T, newStore StoreFactory, opts ReclaimOptions
 			if r.Status != idempotency.StatusInProgress {
 				t.Fatalf("before reclaim, Begin must report StatusInProgress, got %v", r.Status)
 			}
-			if time.Now().After(deadline) {
-				t.Fatalf("reservation not reclaimed within %v", opts.ReclaimWithin)
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				t.Fatalf("reservation not reclaimed within declared ReclaimWithin (%v)", opts.ReclaimWithin)
 			}
-			time.Sleep(poll)
+			// Cap the final sleep at the deadline so enforcement stays tight.
+			time.Sleep(min(remaining, poll))
 		}
 		if res2.LeaseToken == res1.LeaseToken {
 			t.Fatal("a reclaimed reservation must mint a fresh, distinct lease token")

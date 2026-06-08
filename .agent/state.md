@@ -1,10 +1,12 @@
 # go-ddd-core State
 
 Last verified: 2026-06-08 Asia/Taipei (`ports/idempotency` contract + conformance
-suite written on `feat/ports-idempotency`; local gofmt/vet/build/`go test -race`
-green; PR not yet opened, NO tag — tag-gate awaits first adapter consumer). Prior:
-2026-06-05 (v0.7.0 AuthZ core tag shipped; adapter dep-bump + tag delegated to the
-adapter session).
+suite on `feat/ports-idempotency`; **PR #17 open** against `main`, CI green; review
+Medium finding fixed — `RunReclaimContract` now enforces the exact declared
+`ReclaimWithin` and fails on a non-positive value; local gofmt/vet/build/`go test
+-race` green; **NO tag** — tag-gate awaits first adapter consumer). Prior: 2026-06-05
+(v0.7.0 AuthZ core tag shipped; adapter dep-bump + tag delegated to the adapter
+session).
 
 v0.7.0 (AuthZ): annotated tag `v0.7.0` (object `c4a4dc1` → merge commit
 `3729add`, release-prep PR #15) pushed to origin; `gh api
@@ -39,7 +41,7 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Idempotency Contract Cycle: CONTRACT WRITTEN — PR pending, NO tag
+## Idempotency Contract Cycle: PR #17 OPEN — NO tag
 
 Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 (`ports/idempotency`). Branch `feat/ports-idempotency` off `main` @ `288d3b6`.
@@ -48,7 +50,8 @@ Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 exported API, is cut once the first adapter consumer lands; v0.7.x stays reserved
 for AuthZ fixes).
 
-Scope written (not yet on `main`, not yet PR'd):
+Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17, branch
+`feat/ports-idempotency` → `main`, not yet merged):
 
 - `A ports/idempotency/idempotency.go` — `Store` (`Begin(ctx, scope, key,
   fingerprint)`/`Finish`/`Cancel`), `Reservation{Scope, Key, LeaseToken,
@@ -61,11 +64,14 @@ Scope written (not yet on `main`, not yet PR'd):
   semantics, malformed input, true-concurrency atomic claim, deterministic ctx
   cancellation) asserting `errorsx.CodeOf` (never HTTP status); opt-in
   `RunReclaimContract(t, factory, ReclaimOptions{ReclaimWithin})` for the
-  eventual-reclaim liveness MUST, real-wait driven by the adapter-declared bound.
+  eventual-reclaim liveness MUST. Real-wait, deadline anchored at reservation
+  creation and held to **exactly** the adapter-declared bound (no suite margin;
+  adapter bakes in jitter); a **non-positive** `ReclaimWithin` **fails** (not skips).
 - `A ports/idempotency/idempotencytest/idempotencytest_test.go` — `_test.go`-local
   mutex-backed `fakeStore` (struct composite key, lease tokens, three states,
-  fingerprint, reclaim-on-`ReclaimWithin`) fed into both `RunStoreContract`
-  (reclaimWithin 0 = never reclaim) and `RunReclaimContract` (40ms), proving both
+  fingerprint, internal `reclaimAfter`) fed into both `RunStoreContract`
+  (`reclaimAfter` 0 = never reclaim) and `RunReclaimContract` (fake reclaims at 20ms,
+  declares 80ms — modelling an adapter that beats its promised bound), proving both
   suites pass against a correct implementation.
 - `A ports/idempotency/idempotency_test.go` — local units: `Status.String()`,
   `StatusUnknown` zero value, and the **only** `httpx` importer

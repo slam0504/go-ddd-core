@@ -246,10 +246,17 @@ concrete backings (in-memory / Redis / SQL) live in adapters.
   precision, cleanup, clock, latency) — so they stay **out** of the deterministic
   `RunStoreContract` (which would turn flaky). Verification is **not** a verbal MUST:
   an opt-in exported `RunReclaimContract(t, factory, ReclaimOptions{ReclaimWithin})`
-  waits the adapter-**declared** `ReclaimWithin` (real wait/poll), *not* a value
-  derived from `LeaseTTL` nor an injected `advance` clock (an injected clock is easy to
-  wire to a false green and forces unnatural internal hooks). `ReclaimWithin == 0`
-  skips, but a production adapter must still document a reclaim policy.
+  holds the store to **exactly** the adapter-**declared** `ReclaimWithin` (real
+  wait/poll, deadline anchored at reservation creation, poll capped so enforcement
+  stays tight), *not* a value derived from `LeaseTTL` nor an injected `advance` clock
+  (an injected clock is easy to wire to a false green and forces unnatural internal
+  hooks). The suite adds **no margin of its own** — the adapter must bake any
+  scheduling jitter into the value it declares (e.g. declare 80ms while actually
+  reclaiming at 20ms). A **non-positive** `ReclaimWithin` **fails** the suite (an
+  adapter with no time-based reclaim simply does not call this helper, but the
+  liveness MUST still requires a documented reclaim policy). Earlier draft skipped on
+  zero and waited `2x + 500ms`; that let an adapter declaring 40ms but reclaiming at
+  500ms pass, defeating "the adapter declares the bound" — removed.
 - **Conformance suite ships now, but enforces only the deterministic state machine.**
   This is a stateful (state machine + lease ownership + Cancel + mismatch + replay)
   contract; a `_test.go`-local fake would only prove "our fake matches our test" and

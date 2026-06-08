@@ -14,7 +14,7 @@ import (
 )
 
 // TestFakeStore_StoreContract proves the deterministic suite is satisfiable by a
-// correct implementation. The fake never reclaims (reclaimWithin == 0) so the
+// correct implementation. The fake never reclaims (reclaimAfter == 0) so the
 // zero-wait state machine is exercised without timing interference.
 func TestFakeStore_StoreContract(t *testing.T) {
 	idempotencytest.RunStoreContract(t, func(t *testing.T) idempotency.Store {
@@ -23,13 +23,18 @@ func TestFakeStore_StoreContract(t *testing.T) {
 }
 
 // TestFakeStore_ReclaimContract proves the opt-in liveness suite is satisfiable.
-// The fake reclaims an unfinished reservation once reclaimWithin elapses, and
-// the suite is told the same bound so its real-wait poll matches the fake.
+// The fake actually reclaims after reclaimAfter, but declares a larger
+// ReclaimWithin to the suite — modelling an adapter that bakes margin into its
+// promised bound. The suite holds the store to the declared bound, so the fake
+// must reclaim comfortably inside it.
 func TestFakeStore_ReclaimContract(t *testing.T) {
-	const reclaimWithin = 40 * time.Millisecond
+	const (
+		reclaimAfter   = 20 * time.Millisecond
+		declaredWithin = 80 * time.Millisecond
+	)
 	idempotencytest.RunReclaimContract(t, func(t *testing.T) idempotency.Store {
-		return newFakeStore(reclaimWithin)
-	}, idempotencytest.ReclaimOptions{ReclaimWithin: reclaimWithin})
+		return newFakeStore(reclaimAfter)
+	}, idempotencytest.ReclaimOptions{ReclaimWithin: declaredWithin})
 }
 
 // fakeKey is a struct composite key, NOT a flattened scope+":"+key string, so
@@ -49,29 +54,31 @@ type fakeEntry struct {
 
 // fakeStore is a mutex-backed reference Store living only in _test.go. It is the
 // minimum correct implementation: atomic claim under a lock, lease-token
-// ownership, fingerprint mismatch, completed retention, and (when reclaimWithin
-// > 0) eventual reclaim of an unfinished in-progress reservation.
+// ownership, fingerprint mismatch, completed retention, and (when reclaimAfter
+// > 0) eventual reclaim of an unfinished in-progress reservation. reclaimAfter
+// is the fake's actual internal reclaim point, which an honest adapter keeps
+// strictly inside the larger ReclaimWithin it declares to the suite.
 type fakeStore struct {
-	mu            sync.Mutex
-	entries       map[fakeKey]*fakeEntry
-	seq           int
-	reclaimWithin time.Duration // 0 = never reclaim (deterministic suite)
+	mu           sync.Mutex
+	entries      map[fakeKey]*fakeEntry
+	seq          int
+	reclaimAfter time.Duration // 0 = never reclaim (deterministic suite)
 }
 
-func newFakeStore(reclaimWithin time.Duration) *fakeStore {
+func newFakeStore(reclaimAfter time.Duration) *fakeStore {
 	return &fakeStore{
-		entries:       make(map[fakeKey]*fakeEntry),
-		reclaimWithin: reclaimWithin,
+		entries:      make(map[fakeKey]*fakeEntry),
+		reclaimAfter: reclaimAfter,
 	}
 }
 
 // reclaimable reports whether an unfinished in-progress entry has outlived the
-// declared reclaim window. Completed records are retained regardless.
+// fake's internal reclaim point. Completed records are retained regardless.
 func (s *fakeStore) reclaimable(e *fakeEntry) bool {
-	if s.reclaimWithin <= 0 || e.status != idempotency.StatusInProgress {
+	if s.reclaimAfter <= 0 || e.status != idempotency.StatusInProgress {
 		return false
 	}
-	return time.Since(e.reservedAt) >= s.reclaimWithin
+	return time.Since(e.reservedAt) >= s.reclaimAfter
 }
 
 // lookup returns the live entry for fk, dropping it first if it is reclaimable.
