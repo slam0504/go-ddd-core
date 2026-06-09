@@ -271,16 +271,20 @@ concrete backings (in-memory / Redis / SQL) live in adapters.
 - **Core ships the contract + conformance helpers only** — no in-memory / Redis / SQL
   Store in core (`idempotencytest`'s `fakeStore` lives in `_test.go`, not a production
   path). Matches the v0.5.0–v0.7.0 minimalism.
-- **Tag gate** (not yet satisfied): the contract is **unreleased** until the first
-  adapter consumer (in-memory / Redis Store in `go-ddd-adapters`) lands. Expected
-  **v0.8.0** (adds exported API → semver minor; v0.7.x reserved for AuthZ fixes).
-  Acceptance criteria the adapter cycle must meet at release-prep:
+- **Tag gate** (satisfied 2026-06-09): the contract shipped unreleased until the
+  first adapter consumer landed — a Redis `Store` adapter in `go-ddd-adapters`
+  PR #27 (merge commit `5248bd5`), pinning core at pseudo-version
+  `v0.7.1-0.20260608093712-0e1292d20462`. The version resolved to **v0.8.0**
+  (adds exported API → semver minor; v0.7.x reserved for AuthZ fixes), cut via
+  release-prep PR (`release/v0.8.0-prep`). The adapter satisfied the acceptance
+  criteria at its release:
   (a) `RunStoreContract` green against the real Store;
   (b) `RunReclaimContract` run with the adapter's declared `ReclaimWithin` + the
   adapter docs declaring its TTL/cleanup policy;
   (c) middleware intent tests — both 409 paths (`StatusInProgress`, `StatusMismatch`),
   `StatusUnknown`→500 (fail-closed), full `StatusCompleted` replay (status + headers +
   body, no handler re-run), `StatusMismatch` non-leak, and the error channel
-  (`CodeInvalidArgument`→400 / `CodeUnavailable`→503). These are written into the
-  contract docs now so the reclaim MUST and the middleware mapping/replay are not left
-  unverified when the adapter lands.
+  (`CodeInvalidArgument`→400 / `CodeUnavailable`→503). These were written into the
+  contract docs at contract time so the reclaim MUST and the middleware mapping/replay
+  were not left unverified when the adapter landed. Same tag-gate discipline used for
+  v0.5.0 / v0.6.0 / v0.7.0.
