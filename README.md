@@ -28,7 +28,7 @@ eventbus/                 Publisher/Subscriber (watermill contract), Outbox, Inb
 ports/                    Infra interfaces (logger, cache, database, storage, httpclient, observability, health, auth, idempotency)
   health/                 Liveness/readiness probe contract [v0.5.0]
   auth/                   AuthN + AuthZ contract: Identity + TokenVerifier + Authorizer [v0.7.0]
-  idempotency/            Inbound-request idempotency: Store + Reservation + Status (lease-guarded claim)
+  idempotency/            Inbound-request idempotency: Store + Reservation + Status (lease-guarded claim) [v0.8.0]
 transport/                Server contracts (http, grpc, graphql) — no library deps
   grpc/                   + interceptor combinators + errorsx → grpc Status mapping [v0.2.0]
   graphql/                + Loader contract, Relay cursor codec, FilterInput → Specification [v0.2.0]

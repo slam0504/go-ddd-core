@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-06-09
+
+Inbound-request idempotency contract. Core adds `ports/idempotency` — guarding a
+non-idempotent operation (typically an HTTP POST) against duplicate execution when
+a client retries with the same idempotency key, distinct from `eventbus.Inbox`
+(broker-side event dedup). Core ships only the `Store` contract plus its exported
+conformance suite; enforcement middleware, key/fingerprint extraction, response
+(de)serialization, and concrete backings live in adapters. The tag gate is
+satisfied by the first consumer — a Redis `Store` adapter in `go-ddd-adapters`
+(PR #27) that runs both `RunStoreContract` and `RunReclaimContract` — the same
+tag-gate discipline used for v0.5.0–v0.7.0. v0.8.0 is an additive minor; v0.7.x
+stays reserved for AuthZ fixes.
 
 ### Added
 
@@ -43,9 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `RunStoreContract(t, factory)` (transport-neutral deterministic state
     machine) and the opt-in `RunReclaimContract(t, factory, ReclaimOptions{ReclaimWithin})`
     (eventual-reclaim liveness MUST, driven by the adapter-declared bound).
-  - Unreleased pending the tag gate: the version is cut once the first adapter
-    consumer (in-memory / Redis Store in `go-ddd-adapters`) lands and runs both
-    conformance helpers — same discipline used for v0.5.0–v0.7.0.
 
 ## [0.7.0] - 2026-06-05
 

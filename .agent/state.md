@@ -1,11 +1,15 @@
 # go-ddd-core State
 
-Last verified: 2026-06-08 Asia/Taipei (`ports/idempotency` contract + conformance
-suite **merged to `main`** via PR #17 — merge commit `0e1292d`, CI green; review
-Medium finding fixed pre-merge — `RunReclaimContract` now enforces the exact declared
-`ReclaimWithin` and fails on a non-positive value; **NO tag** — tag-gate awaits first
-adapter consumer). Prior: 2026-06-05 (v0.7.0 AuthZ core tag shipped; adapter dep-bump
-+ tag delegated to the adapter session).
+Last verified: 2026-06-09 Asia/Taipei (`ports/idempotency` **v0.8.0 RELEASE-PREP** —
+tag gate satisfied by the first adapter consumer, a Redis `Store` adapter in
+`go-ddd-adapters` PR #27 (merge `5248bd5`, pinning core at pseudo-version
+`v0.7.1-0.20260608093712-0e1292d20462`); core cutting `v0.8.0` via
+`release/v0.8.0-prep` per the v0.6.0/v0.7.0 ritual. `gofmt -l`/`go vet`/`go build`/
+`go test ./...` clean on `main` @ `94647da` pre-prep). Prior: 2026-06-08
+(contract + conformance suite merged via PR #17 — `0e1292d`, NO tag; review Medium
+finding fixed pre-merge — `RunReclaimContract` enforces the exact declared
+`ReclaimWithin` and fails on a non-positive value). Prior: 2026-06-05 (v0.7.0 AuthZ
+core tag shipped; adapter dep-bump + tag delegated to the adapter session).
 
 v0.7.0 (AuthZ): annotated tag `v0.7.0` (object `c4a4dc1` → merge commit
 `3729add`, release-prep PR #15) pushed to origin; `gh api
@@ -40,14 +44,22 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Idempotency Contract Cycle: MERGED to main (PR #17) — NO tag
+## Idempotency Contract Cycle: v0.8.0 RELEASE-PREP (tag gate satisfied)
 
 Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
-(`ports/idempotency`). Branch `feat/ports-idempotency` off `main` @ `288d3b6`.
-**Core contract + exported conformance suite only** — no adapter, no middleware,
-**no tag** this cycle (tag-gate: the version, expected **v0.8.0** since it adds
-exported API, is cut once the first adapter consumer lands; v0.7.x stays reserved
-for AuthZ fixes).
+(`ports/idempotency`). Contract + exported conformance suite merged via PR #17
+(merge commit `0e1292d`) off `feat/ports-idempotency`. **Tag gate satisfied
+2026-06-09** by the first adapter consumer — a Redis `Store` adapter in
+`go-ddd-adapters` PR #27 (merge `5248bd5`), which pins core at pseudo-version
+`v0.7.1-0.20260608093712-0e1292d20462` and runs both `RunStoreContract` and
+`RunReclaimContract`. Version resolved to **v0.8.0** (adds exported API → semver
+minor; v0.7.x reserved for AuthZ fixes). Core cutting `v0.8.0` via
+`release/v0.8.0-prep` (CHANGELOG `[Unreleased]`→`[0.8.0] - 2026-06-09`, README
+`idempotency/` row → `[v0.8.0]`, decisions.md tag gate marked satisfied) per the
+v0.6.0/v0.7.0 ritual. **Remaining (delegated to the adapter session):** bump
+`go-ddd-adapters` core dep from the pseudo-version to `v0.8.0` (root +
+`examples/orders`), then cut the adapters tag/Release — both repos match only once
+that lands.
 
 Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17 MERGED, merge commit
 `0e1292d`; branch `feat/ports-idempotency` deleted):
