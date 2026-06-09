@@ -9,10 +9,12 @@ the first adapter consumer, a Redis `Store` adapter in `go-ddd-adapters` PR #27
 (merge `5248bd5`, pinning core at pseudo-version
 `v0.7.1-0.20260608093712-0e1292d20462`); both CI checks green on PR #19,
 `gofmt -l`/`go vet`/`go build`/`go test ./...` clean on `main` @ `94647da`
-pre-prep. **Adapter dep-bump NOT done by this session** — `go-ddd-adapters` still
-pins the pseudo-version and must bump to `v0.8.0` (root + `examples/orders`), then
-cut its own tag/Release; delegated to the adapter session. Until then the two
-repos are NOT on matching tags.) Prior: 2026-06-08
+pre-prep. **Cross-repo cycle CLOSED 2026-06-09** — `go-ddd-adapters` dep-bump
+PR #28 (`chore/bump-core-v0.8.0`, merge `fbd6f65`, commit `411e3bc`) bumped the
+core dep from the pseudo-version to `v0.8.0`; adapters `v0.8.0` annotated tag
+(object `38c12158` → `fbd6f65`) pushed + GitHub Release published as Latest
+(https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.8.0). Both repos now
+on matching `v0.8.0`.) Prior: 2026-06-08
 (contract + conformance suite merged via PR #17 — `0e1292d`, NO tag; review Medium
 finding fixed pre-merge — `RunReclaimContract` enforces the exact declared
 `ReclaimWithin` and fails on a non-positive value). Prior: 2026-06-05 (v0.7.0 AuthZ
@@ -51,7 +53,7 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Idempotency Contract Cycle: CORE TAG SHIPPED (v0.8.0) — adapter dep-bump pending
+## Idempotency Contract Cycle: CLOSED (v0.8.0, both repos matched)
 
 Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 (`ports/idempotency`). Contract + exported conformance suite merged via PR #17
@@ -70,13 +72,16 @@ GitHub Release published as Latest at
 https://github.com/slam0504/go-ddd-core/releases/tag/v0.8.0
 (`gh api repos/.../releases/latest` returns `v0.8.0`).
 
-**Remaining (delegated to the adapter session, NOT this one):** bump
-`go-ddd-adapters` core dep from pseudo-version
-`v0.7.1-0.20260608093712-0e1292d20462` to `v0.8.0` (root + `examples/orders`
-go.mod/go.sum, `go mod tidy`); CI green merge; then annotate + push the adapters
-tag (new Redis idempotency Store package → semver minor) and open its GitHub
-Release. The cross-repo cycle is CLOSED only once that lands and both repos read
-matching tags.
+**Cross-repo close — DONE 2026-06-09** (verified via read-only `gh`):
+`go-ddd-adapters` dep-bump PR #28 (`chore/bump-core-v0.8.0`) merged `fbd6f65`
+(commit `411e3bc` "bump go-ddd-core to v0.8.0 and cut the v0.8.0 changelog"),
+moving the core pin from pseudo-version `v0.7.1-0.20260608093712-0e1292d20462` to
+`v0.8.0`. Adapters `v0.8.0` annotated tag (object `38c12158` → `fbd6f65`) pushed,
+GitHub Release published as Latest at
+https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.8.0. The Redis
+idempotency Store consumer landed earlier in adapters PR #27 (`5248bd5`). Both
+repos now read matching `v0.8.0` — same 2-step cross-repo close used for
+v0.5.0–v0.7.0.
 
 Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17 MERGED, merge commit
 `0e1292d`; branch `feat/ports-idempotency` deleted):
