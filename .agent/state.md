@@ -1,11 +1,18 @@
 # go-ddd-core State
 
-Last verified: 2026-06-09 Asia/Taipei (`ports/idempotency` **v0.8.0 RELEASE-PREP** —
-tag gate satisfied by the first adapter consumer, a Redis `Store` adapter in
-`go-ddd-adapters` PR #27 (merge `5248bd5`, pinning core at pseudo-version
-`v0.7.1-0.20260608093712-0e1292d20462`); core cutting `v0.8.0` via
-`release/v0.8.0-prep` per the v0.6.0/v0.7.0 ritual. `gofmt -l`/`go vet`/`go build`/
-`go test ./...` clean on `main` @ `94647da` pre-prep). Prior: 2026-06-08
+Last verified: 2026-06-09 Asia/Taipei (`ports/idempotency` **v0.8.0 CORE TAG
+SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
+`b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
+`v0.8.0`, GitHub Release published as Latest at
+https://github.com/slam0504/go-ddd-core/releases/tag/v0.8.0. Tag gate satisfied by
+the first adapter consumer, a Redis `Store` adapter in `go-ddd-adapters` PR #27
+(merge `5248bd5`, pinning core at pseudo-version
+`v0.7.1-0.20260608093712-0e1292d20462`); both CI checks green on PR #19,
+`gofmt -l`/`go vet`/`go build`/`go test ./...` clean on `main` @ `94647da`
+pre-prep. **Adapter dep-bump NOT done by this session** — `go-ddd-adapters` still
+pins the pseudo-version and must bump to `v0.8.0` (root + `examples/orders`), then
+cut its own tag/Release; delegated to the adapter session. Until then the two
+repos are NOT on matching tags.) Prior: 2026-06-08
 (contract + conformance suite merged via PR #17 — `0e1292d`, NO tag; review Medium
 finding fixed pre-merge — `RunReclaimContract` enforces the exact declared
 `ReclaimWithin` and fails on a non-positive value). Prior: 2026-06-05 (v0.7.0 AuthZ
@@ -44,7 +51,7 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Idempotency Contract Cycle: v0.8.0 RELEASE-PREP (tag gate satisfied)
+## Idempotency Contract Cycle: CORE TAG SHIPPED (v0.8.0) — adapter dep-bump pending
 
 Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 (`ports/idempotency`). Contract + exported conformance suite merged via PR #17
@@ -53,13 +60,23 @@ Next A-quadrant item after health/AuthN/AuthZ: inbound-request idempotency
 `go-ddd-adapters` PR #27 (merge `5248bd5`), which pins core at pseudo-version
 `v0.7.1-0.20260608093712-0e1292d20462` and runs both `RunStoreContract` and
 `RunReclaimContract`. Version resolved to **v0.8.0** (adds exported API → semver
-minor; v0.7.x reserved for AuthZ fixes). Core cutting `v0.8.0` via
-`release/v0.8.0-prep` (CHANGELOG `[Unreleased]`→`[0.8.0] - 2026-06-09`, README
-`idempotency/` row → `[v0.8.0]`, decisions.md tag gate marked satisfied) per the
-v0.6.0/v0.7.0 ritual. **Remaining (delegated to the adapter session):** bump
-`go-ddd-adapters` core dep from the pseudo-version to `v0.8.0` (root +
-`examples/orders`), then cut the adapters tag/Release — both repos match only once
-that lands.
+minor; v0.7.x reserved for AuthZ fixes).
+
+**Core tag SHIPPED**: release-prep PR #19 (`release/v0.8.0-prep` → `main`) merged
+`b0a0e74` after both CI checks green (CHANGELOG `[Unreleased]`→`[0.8.0] -
+2026-06-09`, README `idempotency/` row → `[v0.8.0]`, decisions.md tag gate marked
+satisfied). Annotated tag `v0.8.0` (object `202d437` → `b0a0e74`) pushed to origin;
+GitHub Release published as Latest at
+https://github.com/slam0504/go-ddd-core/releases/tag/v0.8.0
+(`gh api repos/.../releases/latest` returns `v0.8.0`).
+
+**Remaining (delegated to the adapter session, NOT this one):** bump
+`go-ddd-adapters` core dep from pseudo-version
+`v0.7.1-0.20260608093712-0e1292d20462` to `v0.8.0` (root + `examples/orders`
+go.mod/go.sum, `go mod tidy`); CI green merge; then annotate + push the adapters
+tag (new Redis idempotency Store package → semver minor) and open its GitHub
+Release. The cross-repo cycle is CLOSED only once that lands and both repos read
+matching tags.
 
 Scope (PR #17 https://github.com/slam0504/go-ddd-core/pull/17 MERGED, merge commit
 `0e1292d`; branch `feat/ports-idempotency` deleted):
