@@ -1,6 +1,9 @@
 # go-ddd-core State
 
-Last verified: 2026-06-09 Asia/Taipei (`ports/idempotency` **v0.8.0 CORE TAG
+Last verified: 2026-06-11 Asia/Taipei (`ports/jobs` contract IMPLEMENTED on
+branch `feat/ports-jobs`, PR pending — see "Jobs Contract Cycle" below; spike
+gate PASSED in `go-ddd-adapters` throwaway branch `spike/jobs-asynq`).
+Prior: 2026-06-09 (`ports/idempotency` **v0.8.0 CORE TAG
 SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
 `b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
 `v0.8.0`, GitHub Release published as Latest at
@@ -52,6 +55,49 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 `a02f6d4` → `45274dd`) pushed, GitHub Release published as Latest
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
+
+## Jobs Contract Cycle: IN PROGRESS (contract implemented, PR pending, NO tag)
+
+Next A-quadrant item after idempotency: background jobs (`ports/jobs`).
+Plan converged over 18 Codex REVISE rounds (base) + R19–R29 (incl. one manual
+owner review replacing a failed Codex run); normative plan:
+`~/.claude/plans/quizzical-drifting-raccoon.md`.
+
+**Spike gate PASSED 2026-06-11** (owner-decreed pre-merge gate): throwaway
+branch `spike/jobs-asynq` in `go-ddd-adapters` (replace-directive on local
+core, never merged) — real Asynq v0.24.1 + miniredis v2.38.0 delivery smoke,
+plus three testcontainers-Redis shutdown-semantics tests (stuck-handler /
+Redis-down-during-shutdown with operation-specific fault evidence /
+ack-shutdown race ×20) all PASS under `-race` (full suite 99.9s); River
+v0.39.0 compile-level mapping holds (runtime UNVERIFIED). Pinned versions +
+go.sum hashes + deviations recorded in `.agent/decisions.md` "Background Jobs
+Contract".
+
+Scope on `feat/ports-jobs` (off `main` @ `5c20a28`):
+
+- `A ports/jobs/jobs.go` — `Enqueuer`/`Worker`/`Job`/`Task`/`JobInfo`/
+  `Handler`/`HandlerFunc`; imports only `context`+`time`; at-least-once floor
+  (six prerequisites), two-class Enqueue errors with fixed precedence,
+  snapshot-before-submit, caller-observable Run endpoints + recoverable-state
+  model, homogeneous-worker-pool precondition, nil/empty payload equivalence.
+- `A ports/jobs/jobstest/jobstest.go` — exported synchronous-only suite
+  (`Backend`/`Factory`/`RunContract`, never calls `Run`): 9 subtests incl.
+  DeadlineExceeded variants + EnqueueNilPayloadAccepted.
+- `A ports/jobs/jobstest/jobstest_test.go` — suite self-test via local fake.
+- `A ports/jobs/jobs_test.go` — executable spec: fakeStore+fakeWorker
+  (injected clock, lease, unavailable/fatal/accepted-but-ack-lost/
+  teardown-failure switches); ~25 tests incl. shutdown-recoverability pair
+  (LateAckCompletes / NoAckIsRedelivered) and the single `httpx` importer
+  (400/409/503).
+- `M CHANGELOG.md` (`[Unreleased]`), `M README.md` (`jobs/` row, no version
+  bracket), `M docs/roadmap.md` (surgical jobs row: `Scheduler`+cron sketch →
+  actual `Enqueuer`/`Worker` API, cron exclusion noted),
+  `M .agent/decisions.md` (design + spike results + tag-gate (0)+(a)–(v)),
+  `M .agent/state.md` (this block).
+
+**Tag gate NOT satisfied** — no tag, no Release until the first production
+adapter passes (0)+(a)–(v) (see decisions.md). Expected version on close:
+**v0.9.0** (additive minor).
 
 ## Idempotency Contract Cycle: CLOSED (v0.8.0, both repos matched)
 
