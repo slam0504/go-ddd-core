@@ -226,7 +226,9 @@ func (w *fakeWorker) Register(jobType string, h jobs.Handler) error {
 
 func (w *fakeWorker) Run(ctx context.Context) error {
 	if ctx.Err() != nil {
-		return nil // already cancelled: clean nil without starting
+		// Contract endpoint (A): cancellation is the expected stop signal, so a
+		// pre-cancelled ctx returns nil without starting.
+		return nil //nolint:nilerr
 	}
 	if w.fatalStartup != nil {
 		return w.fatalStartup
