@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] - 2026-06-16
 
 Background-jobs contract. Core adds `ports/jobs` — enqueuing a unit of work to
 be executed asynchronously by a worker, immediately or at a scheduled time —
@@ -14,12 +14,13 @@ consumers). Core ships only the `Enqueuer`/`Worker` contracts, the
 `Job`/`Task`/`JobInfo` value types, and a synchronous-only exported conformance
 suite; retry/backoff schedules, dead-lettering, queue routing, cron/recurring
 scheduling, and concrete backings (Asynq, River, SQL queues) live in adapters.
-The tag gate follows the v0.5.0–v0.8.0 discipline: no tag until the first
-adapter consumer lands and passes the acceptance criteria recorded in
-`.agent/decisions.md`. The contract's API mapping was de-risked pre-merge by a
-compile-tested throwaway spike in `go-ddd-adapters` (real Asynq + miniredis
+The tag gate (v0.5.0–v0.8.0 discipline) was satisfied by the first adapter
+consumer — a `jobs/asynq` Enqueuer/Worker adapter in `go-ddd-adapters` (PR #29)
+that passes the `(0)+(a)–(v)` acceptance criteria recorded in
+`.agent/decisions.md`. The contract's API mapping had additionally been
+de-risked pre-merge by a compile-tested throwaway spike (real Asynq + miniredis
 delivery smoke plus three testcontainers-Redis shutdown-semantics tests; River
-verified at compile level only).
+verified at compile level only). v0.9.0 is an additive minor.
 
 ### Added
 
