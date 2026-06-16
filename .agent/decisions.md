@@ -288,3 +288,165 @@ concrete backings (in-memory / Redis / SQL) live in adapters.
   contract docs at contract time so the reclaim MUST and the middleware mapping/replay
   were not left unverified when the adapter landed. Same tag-gate discipline used for
   v0.5.0 / v0.6.0 / v0.7.0.
+
+## Background Jobs Contract (`ports/jobs`, post-v0.8.0)
+
+- **jobs vs eventbus**: eventbus carries domain events (facts, fanned out to many
+  independent consumers); jobs carries tasks (work to do, handed to one worker
+  pool, with run-at scheduling and an execution lifecycle). A domain event MAY
+  trigger a job; they are different primitives. `Relay.Run(ctx)`'s
+  blocks-until-cancelled lifecycle shape is reused, not its event coupling.
+- **Shape**: `Enqueuer.Enqueue(ctx, Job) (JobInfo, error)`,
+  `Worker.Register(type, Handler) error` + `Run(ctx) error`,
+  `Job{Type, Payload, ProcessAt}` / `Task{ID, Type, Payload}` / `JobInfo{ID}`,
+  `Handler`/`HandlerFunc`. No `Status` enum, no sentinels (`errorsx` codes via
+  doc-fixed mapping: `CodeInvalidArgument`→400, `CodeAlreadyExists`→409,
+  `CodeUnavailable`→503 — all pre-existing), no func-adapters for the
+  multi-method roles.
+- **Deliberately excluded (YAGNI until consumer evidence)**: cron/recurring
+  scheduling, `MaxRetries`/skip-retry signals (retry/backoff/dead-letter are
+  adapter policy), queue/lane routing fields, enqueue-side dedup
+  (`ports/idempotency` covers handler-side), result/await (that is
+  RPC/workflow), per-job timeout fields, ack/attempt observation hooks.
+- **At-least-once floor, six prerequisites**: nil-error Enqueue / sustained
+  worker-running / handler registered at delivery / sustained backend
+  reachability / no durable loss / ProcessAt arrived. (2) and (4) are sustained
+  liveness conditions — outages and worker stops suspend (retain), never drop;
+  retain-until-dequeue with durable-loss as the only pre-attempt exception.
+- **Two-class Enqueue errors, fixed precedence**: (1a) empty Type → (1b)
+  out-of-horizon ProcessAt → (2a) ctx (entry check before backend contact;
+  Canceled and DeadlineExceeded both) → (2b) backend (always coded, never
+  `CodeUnknown`; unclassifiable → `CodeInternal`). Class 2 is INDETERMINATE
+  except the pre-cancelled/pre-expired entry check. snapshot-before-submit:
+  payload copy precedes any backend I/O, so accepted-but-ack-lost jobs stay
+  isolated from caller mutation.
+- **Run endpoints, caller-observable**: (A) cancellation with no independent
+  fatal → nil (errors arising FROM shutting down are not fatals: logged, never
+  returned); (B) independent fatal, no cancellation → coded errorsx; overlap →
+  either, callers tolerate both. Liveness over graceful drain (stuck handler is
+  orphaned, never blocks Run); conformance bound is implementation-declared
+  (`ShutdownWithin`, mirrors `ReclaimWithin`; non-positive = failure).
+  Recoverable-state model after Run returns: completed (late ack, atomic) /
+  pending-retryable / transient active-leased resolving within a declared
+  bound; terminal loss is the only illegal outcome.
+- **Homogeneous worker pool is a deployment precondition**: no type-based
+  routing across workers sharing a backing-store namespace; the unhandled-job
+  policy surfaces violations loudly (never acked as success).
+- **Suite split (owner decision, upheld across reviews)**: exported
+  `jobstest.RunContract` covers ONLY the synchronous interface-return surface
+  (validation codes + precedence incl. DeadlineExceeded variants, zero/non-zero
+  `JobInfo`, Register semantics) — it never runs a worker, so it cannot flake.
+  Delivery/timing invariants are demonstrated by the core-local fake
+  (executable spec, injected clock + lease) and ENFORCED on adapters by the
+  tag-gate intent tests below.
+
+### Compile-tested spike (pre-merge gate — executed 2026-06-11, results)
+
+Throwaway branch `spike/jobs-asynq` in `go-ddd-adapters` (replace-directive on
+local core; never merged). All tests `go test -race`; testcontainers Redis
+(Docker required — a skip would have counted as gate failure, none occurred).
+
+- **Pinned versions (resolved via `go get`, go.sum verbatim)**:
+  - `github.com/hibiken/asynq v0.24.1`
+    `h1:+5iIEAyA9K/lcSPvx3qoPtsKJeKI5u9aOIvUmSsazEw=`
+  - `github.com/alicebob/miniredis/v2 v2.38.0`
+    `h1:nZAzCR+Lj+Vxk4ZXzm2NuKq2O33RXj1XxJ2e2uP9jiw=`
+  - `github.com/riverqueue/river v0.39.0`
+    `h1:VsoPJ8KTx7SvWQGWtdLjKxw15IjnYHj3xKb0UA+7200=` (+
+    `riverdriver/riverpgxv5 v0.39.0`); v0 line as planned, no v1 upstream.
+  - `github.com/testcontainers/testcontainers-go v0.42.0` (already pinned by
+    the adapters module)
+    `h1:He3IhTzTZOygSXLJPMX7n44XtK+qhjat1nI9cneBbUY=`
+- **Asynq mapping holds** (build clean + miniredis delivery smoke PASS):
+  contract implements naturally; two adapter-layer notes confirmed —
+  (1) dispatch MUST use a self-managed exact-match map, not `asynq.ServeMux`
+  (longest-prefix matching violates exact-type-match); (2) `srv.Shutdown()`
+  returns no error (requeue failures are logged), matching the
+  cancellation-commits-to-nil endpoint.
+- **Three shutdown-semantics tests (testcontainers Redis 7) all PASS**:
+  1. Stuck handler: Run nil within `ShutdownWithin` (2s asynq drain bound,
+     10s declared); fresh Worker instance actually redelivered.
+  2. Redis stopped mid-shutdown (synchronized: handler dequeued+blocked →
+     container stopped → ctx cancelled): Run nil while down; operation-specific
+     evidence captured — failed `evalsha` touching
+     `asynq:{default}:active`/`:lease`/`:pending` (the requeue script) plus
+     asynq log "Could not push task ... back to queue"; after restart the job
+     was actually redelivered (retryable branch). Deviations from plan, both
+     evidence-strengthening: container stop/start used instead of pause
+     (deterministic connection-refused beats hung commands), and the failed
+     command's full key set recorded (subsumes the script-SHA/key-prefix
+     classification concern — poll false-positives excluded because the
+     evidence command carries the requeue key tuple).
+  3. Ack/shutdown race ×20 iterations: every job ended completed (Inspector +
+     `asynq.Retention` evidence) or retryable-then-redelivered; none lost, none
+     stuck active beyond the declared bound. asynq's ack (`Done`) runs as an
+     atomic Lua script — consistent with the binary late-ack rule.
+  Docker port note: a stopped+started container re-publishes its random host
+  port; recovery-phase clients must re-resolve the endpoint (spike test does).
+- **River compile-level mapping holds** (build clean, runtime UNVERIFIED —
+  needs Postgres; deferred to its own adapter cycle): single envelope
+  `JobArgs{Kind() fixed}` + dispatching generic worker; `Insert` +
+  `InsertOpts.ScheduledAt` maps ProcessAt; int64 job ID → `strconv` string.
+
+### Tag gate (NOT satisfied — no tag until the first adapter consumer)
+
+The first production adapter must pass **(0)+(a)–(v)**, all mandatory, all
+under `go test -race`:
+
+- (0) `ports/jobs/jobstest.RunContract` green.
+- (a) at-least-once redelivery incl. concurrent-duplicate tolerance;
+- (b) dispatch not before `ProcessAt` on the backend's own scheduling clock
+  (control/observe that clock; single clock, no margin);
+- (c) Run returns nil within the adapter-declared `ShutdownWithin` (timed from
+  cancel, no extra margin, non-positive = `t.Fatalf`), incl. the
+  teardown-failure variant (injected shutdown-path backend error → still nil);
+- (d) handler payload mutation does not pollute redelivery;
+- (e) ID stable across redeliveries;
+- (f) unreachable backend → `CodeUnavailable`; generalized variant: ANY
+  non-ctx backend failure yields `errorsx.CodeOf != CodeUnknown`
+  (unclassifiable → `CodeInternal`);
+- (g) malformed Enqueue writes nothing (introspection);
+- (h) fatal startup → coded errorsx (non-nil, not a ctx error);
+- (i) enqueue payload snapshot;
+- (j) handler ctx cancelled on shutdown;
+- (k) exact-type-match dispatch rejects prefixes;
+- (l) concurrent Enqueue clean under -race + Run's two endpoints (no
+  simultaneous-race tie-break assertion);
+- (m) out-of-horizon ProcessAt rejected at Enqueue (`CodeInvalidArgument`,
+  zero JobInfo, nothing written; precedence over cancelled ctx);
+- (n) accepted scheduled job retained past ProcessAt without a worker;
+- (o) duplicate Register keeps the original handler (h1 receives, not h2);
+- (p) past ProcessAt immediately eligible;
+- (q) ctx precedes backend within class 2 — both variants against an
+  unavailable backend: pre-cancelled → `Canceled`; pre-expired deadline →
+  `DeadlineExceeded`; zero JobInfo + no backend contact;
+- (r) worker stopping before dequeue, then a NEW Worker instance over the same
+  store delivers (Run once per instance);
+- (s) shutdown in-flight recoverability, split deterministic:
+  (s1) late-ack branch — release the blocked handler after Run returns; within
+  the declared `RecoverWithin` the job reaches completed (or
+  pending-retryable, then prove via (s2) step 4);
+  (s2) never-ack branch — within `RecoverWithin` the job reaches
+  pending-retryable (lost = fail; stuck active/leased past the bound = fail),
+  then a NEW Worker instance MUST actually redeliver within the declared
+  `RedeliverWithin`.
+  Fixture: `RecoverWithin`/`RedeliverWithin` (non-positive = `t.Fatalf`;
+  RecoverWithin folds in the lease TTL) + `JobState(ctx, id)` introspection
+  classifying completed / pendingRetryable / activeLeased / lostDiscarded;
+  introspection errors = `t.Fatalf`; not-found with no completion evidence =
+  lostDiscarded (backends that prune completed jobs must give the fixture a
+  completion-evidence channel, e.g. test-scoped retention);
+- (t) accepted-but-ack-lost fault: Enqueue error follows class-2 rules (ctx
+  error or coded non-Unknown) + zero JobInfo; caller mutation after the error
+  does not corrupt the accepted job's payload (snapshot-before-submit);
+- (u) unhandled type never acked as success and follows the DOCUMENTED
+  unhandled-job policy (introspection-verified);
+- (v) single-source declared values: the documented scheduling horizon,
+  durability boundary, and `ShutdownWithin`/`RecoverWithin`/`RedeliverWithin`
+  MUST be the same exported constants/options the intent-test fixtures use.
+
+Plus: adapter docs declare the retry/backoff/dead-letter policy and the
+fatal-code taxonomy; after the first adapter lands, distill the delivery/timing
+half of `jobstest` from the proven common semantics. Until (0)+(a)–(v) pass on
+a merged adapter, core stays untagged (no SemVer tag, no GitHub Release —
+pseudo-version-only compensating control, same as v0.5.0–v0.8.0).

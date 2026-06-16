@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Background-jobs contract. Core adds `ports/jobs` — enqueuing a unit of work to
+be executed asynchronously by a worker, immediately or at a scheduled time —
+distinct from `eventbus` (domain events fanned out to many independent
+consumers). Core ships only the `Enqueuer`/`Worker` contracts, the
+`Job`/`Task`/`JobInfo` value types, and a synchronous-only exported conformance
+suite; retry/backoff schedules, dead-lettering, queue routing, cron/recurring
+scheduling, and concrete backings (Asynq, River, SQL queues) live in adapters.
+The tag gate follows the v0.5.0–v0.8.0 discipline: no tag until the first
+adapter consumer lands and passes the acceptance criteria recorded in
+`.agent/decisions.md`. The contract's API mapping was de-risked pre-merge by a
+compile-tested throwaway spike in `go-ddd-adapters` (real Asynq + miniredis
+delivery smoke plus three testcontainers-Redis shutdown-semantics tests; River
+verified at compile level only).
+
+### Added
+
+- `ports/jobs` background-jobs contract:
+  - `Enqueuer.Enqueue(ctx, Job) (JobInfo, error)` — snapshot-before-submit
+    payload copy; two-class error model with fixed precedence (deterministic
+    validation → `CodeInvalidArgument`; ctx errors observed before backend
+    contact; backend failures always carry a coded `errorsx` code, never
+    `CodeUnknown`); zero `JobInfo` on any error.
+  - `Worker.Register(jobType, Handler) error` — fail-loud wiring: argument
+    validation (`CodeInvalidArgument`) precedes the duplicate check
+    (`CodeAlreadyExists`, original handler stays installed); exact-type-match
+    dispatch (no prefix routing).
+  - `Worker.Run(ctx) error` — cancellation returns nil (teardown errors never
+    change the return value); independent fatals return coded `errorsx`;
+    bounded best-effort drain with the recoverable-state model for un-acked
+    in-flight tasks (completed via late ack / pending-retryable /
+    transient active-leased — terminal loss is the only illegal outcome).
+  - `Job`/`Task`/`JobInfo` value types; `Handler` + `HandlerFunc`; at-least-once
+    delivery floor bounded by six explicit prerequisites; `ProcessAt` "no
+    earlier than" semantics judged on the backend's own scheduling clock;
+    retain-until-dequeue; nil/empty payload equivalence.
+- `ports/jobs/jobstest` exported synchronous-only conformance suite
+  (`Backend`/`Factory`/`RunContract`): Enqueue validation codes + precedence
+  (including the `DeadlineExceeded` variants), non-empty/zero `JobInfo.ID`,
+  ctx cancellation/deadline entry checks, and Register validation — never runs
+  a worker, so it cannot flake. Delivery-side invariants are demonstrated by
+  the core-local fake in `ports/jobs` tests and enforced on adapters via the
+  tag-gate intent tests.
+
 ## [0.8.0] - 2026-06-09
 
 Inbound-request idempotency contract. Core adds `ports/idempotency` — guarding a
