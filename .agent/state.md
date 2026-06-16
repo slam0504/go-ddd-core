@@ -1,13 +1,16 @@
 # go-ddd-core State
 
-Last verified: 2026-06-16 Asia/Taipei (`ports/jobs` **v0.9.0 RELEASE IN
-PROGRESS** — contract merged via PR #22 (`728c9d0`); tag gate SATISFIED by the
-first adapter, `jobs/asynq` in `go-ddd-adapters` PR #29 (`1f8a685`, pins core
-pseudo-version `v0.8.1-0.20260616032638-784ef3ea2bcc`, passes (0)+(a)–(v)
-under -race); release-prep PR `release/v0.9.0-prep` open — CHANGELOG
-`[0.9.0]`, README `jobs/` `[v0.9.0]`, decisions.md tag-gate marked satisfied.
-Tag/Release + adapters dep-bump pending. See "Jobs Contract Cycle" below.)
-Prior: 2026-06-09 (`ports/idempotency` **v0.8.0 CORE TAG
+Last verified: 2026-06-16 Asia/Taipei (`ports/jobs` **v0.9.0 SHIPPED, cross-repo
+cycle CLOSED** — both repos on matching `v0.9.0`. Core: contract PR #22
+(`728c9d0`), release-prep PR #24 (`956314c`), annotated tag `v0.9.0` (object
+`8ef2fbe` → `956314c`) + GitHub Release Latest
+(https://github.com/slam0504/go-ddd-core/releases/tag/v0.9.0, `releases/latest`
+returns `v0.9.0`). Tag gate satisfied by the first adapter, `jobs/asynq` in
+`go-ddd-adapters` PR #29 (`1f8a685`), passing (0)+(a)–(v) under -race. Adapters
+dep-bump PR #30 (`040228b`) moved core pseudo-version → `v0.9.0` (root +
+examples/orders), adapters annotated tag `v0.9.0` (→ `040228b`) + GitHub
+Release Latest. See "Jobs Contract Cycle" below.) Prior: 2026-06-09
+(`ports/idempotency` **v0.8.0 CORE TAG
 SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
 `b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
 `v0.8.0`, GitHub Release published as Latest at
@@ -60,18 +63,29 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Jobs Contract Cycle: TAG GATE SATISFIED → v0.9.0 RELEASE IN PROGRESS
+## Jobs Contract Cycle: CLOSED (v0.9.0, both repos matched)
 
 **Tag gate SATISFIED 2026-06-16**: first production adapter — `jobs/asynq`
 (`jobsasynq`) over `hibiken/asynq v0.24.1` in `go-ddd-adapters` PR #29 (merge
 `1f8a685`), pinning core at pseudo-version
 `v0.8.1-0.20260616032638-784ef3ea2bcc` and passing all of `(0)+(a)–(v)` under
-`go test -race`. Version resolves to **v0.9.0** (additive minor). Core
-release-prep PR `release/v0.9.0-prep` opened (CHANGELOG `[Unreleased]`→
-`[0.9.0]`, README `jobs/` row `[v0.9.0]`, decisions.md tag-gate marked
-satisfied, state.md). **Remaining**: merge release-prep → annotated tag
-`v0.9.0` + GitHub Release; then adapters dep-bump (pseudo-version → `v0.9.0`)
-+ adapters tag/Release to close the cross-repo cycle.
+`go test -race` (incl. the testcontainers-Redis integration suite). Version
+resolved to **v0.9.0** (additive minor).
+
+**Core tag SHIPPED**: release-prep PR #24 (`release/v0.9.0-prep` → `main`)
+merged `956314c` after both CI checks green (CHANGELOG `[Unreleased]`→
+`[0.9.0] - 2026-06-16`, README `jobs/` row `[v0.9.0]`, decisions.md tag-gate
+marked satisfied). Annotated tag `v0.9.0` (object `8ef2fbe` → `956314c`)
+pushed; GitHub Release published as Latest
+(https://github.com/slam0504/go-ddd-core/releases/tag/v0.9.0).
+
+**Cross-repo close — DONE 2026-06-16**: adapters dep-bump PR #30
+(`chore/bump-core-v0.9.0`, merge `040228b`) moved the core pin from the
+pseudo-version to `v0.9.0` in BOTH the root module and `examples/orders`; all 5
+CI checks green (lint ×2, build+test ×2, integration testcontainers 5m23s).
+Adapters annotated tag `v0.9.0` (→ `040228b`) pushed + GitHub Release Latest
+(https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.9.0). Both repos
+now read matching `v0.9.0` — same 2-step cross-repo close as v0.5.0–v0.8.0.
 
 ## Jobs Contract Cycle: CONTRACT MERGED (PR #22, NO tag — historical)
 
