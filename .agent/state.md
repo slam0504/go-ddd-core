@@ -1,9 +1,10 @@
 # go-ddd-core State
 
-Last verified: 2026-06-11 Asia/Taipei (`ports/jobs` contract IMPLEMENTED on
-branch `feat/ports-jobs`, PR pending — see "Jobs Contract Cycle" below; spike
-gate PASSED in `go-ddd-adapters` throwaway branch `spike/jobs-asynq`).
-Prior: 2026-06-09 (`ports/idempotency` **v0.8.0 CORE TAG
+Last verified: 2026-06-16 Asia/Taipei (`ports/jobs` contract **MERGED to
+`main`** via PR #22, merge commit `728c9d0` — see "Jobs Contract Cycle" below;
+spike gate PASSED in `go-ddd-adapters` throwaway branch `spike/jobs-asynq`;
+branch `feat/ports-jobs` deleted local + remote; **NO tag** — tag gate still
+open). Prior: 2026-06-09 (`ports/idempotency` **v0.8.0 CORE TAG
 SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
 `b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
 `v0.8.0`, GitHub Release published as Latest at
@@ -56,12 +57,20 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Jobs Contract Cycle: IN PROGRESS (contract implemented, PR pending, NO tag)
+## Jobs Contract Cycle: CONTRACT MERGED (PR #22, NO tag — tag gate open)
 
 Next A-quadrant item after idempotency: background jobs (`ports/jobs`).
 Plan converged over 18 Codex REVISE rounds (base) + R19–R29 (incl. one manual
 owner review replacing a failed Codex run); normative plan:
 `~/.claude/plans/quizzical-drifting-raccoon.md`.
+
+**Contract MERGED 2026-06-16**: PR #22 (`feat/ports-jobs` → `main`) merged at
+**`728c9d0`** after both CI checks green (build+test, golangci-lint — the
+latter needed a `//nolint:nilerr` on the fake worker's pre-cancelled-ctx
+nil return, which IS the contract's endpoint A). Branch `feat/ports-jobs`
+deleted local + remote. Local `main` fast-forwarded to origin; `go build` +
+`go test -race ./ports/jobs/...` green post-merge, `gofmt -l ports/jobs/`
+clean.
 
 **Spike gate PASSED 2026-06-11** (owner-decreed pre-merge gate): throwaway
 branch `spike/jobs-asynq` in `go-ddd-adapters` (replace-directive on local
@@ -73,7 +82,7 @@ v0.39.0 compile-level mapping holds (runtime UNVERIFIED). Pinned versions +
 go.sum hashes + deviations recorded in `.agent/decisions.md` "Background Jobs
 Contract".
 
-Scope on `feat/ports-jobs` (off `main` @ `5c20a28`):
+Scope (merged via PR #22, merge commit `728c9d0`; was off `main` @ `5c20a28`):
 
 - `A ports/jobs/jobs.go` — `Enqueuer`/`Worker`/`Job`/`Task`/`JobInfo`/
   `Handler`/`HandlerFunc`; imports only `context`+`time`; at-least-once floor
