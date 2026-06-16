@@ -388,7 +388,18 @@ local core; never merged). All tests `go test -race`; testcontainers Redis
   `JobArgs{Kind() fixed}` + dispatching generic worker; `Insert` +
   `InsertOpts.ScheduledAt` maps ProcessAt; int64 job ID → `strconv` string.
 
-### Tag gate (NOT satisfied — no tag until the first adapter consumer)
+### Tag gate (SATISFIED 2026-06-16 → v0.9.0)
+
+Satisfied by the first production adapter — a `jobs/asynq` Enqueuer/Worker
+adapter (`jobsasynq`) over `hibiken/asynq v0.24.1` in `go-ddd-adapters` PR #29
+(merge `1f8a685`), which pins core at the pseudo-version
+`v0.8.1-0.20260616032638-784ef3ea2bcc` and passes all of `(0)+(a)–(v)` under
+`go test -race`. The version resolved to **v0.9.0** (additive minor; the
+contract is an exported API addition). Built subagent-driven (14-task
+sequence) with two main-session review passes that caught a `nilerr`
+false-positive, a panic-to-error guard, and an `(t)` semantic gap (reworked
+into a deterministic hook-injected test) and confirmed two implementer
+plan-deviations as correct.
 
 The first production adapter must pass **(0)+(a)–(v)**, all mandatory, all
 under `go test -race`:
@@ -447,6 +458,7 @@ under `go test -race`:
 
 Plus: adapter docs declare the retry/backoff/dead-letter policy and the
 fatal-code taxonomy; after the first adapter lands, distill the delivery/timing
-half of `jobstest` from the proven common semantics. Until (0)+(a)–(v) pass on
-a merged adapter, core stays untagged (no SemVer tag, no GitHub Release —
-pseudo-version-only compensating control, same as v0.5.0–v0.8.0).
+half of `jobstest` from the proven common semantics. The pseudo-version-only
+compensating control held until the adapter landed; with PR #29 merged and
+`(0)+(a)–(v)` green, core cut **v0.9.0** (release-prep PR + annotated tag +
+GitHub Release as Latest), same 2-step cross-repo close as v0.5.0–v0.8.0.

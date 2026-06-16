@@ -1,10 +1,13 @@
 # go-ddd-core State
 
-Last verified: 2026-06-16 Asia/Taipei (`ports/jobs` contract **MERGED to
-`main`** via PR #22, merge commit `728c9d0` — see "Jobs Contract Cycle" below;
-spike gate PASSED in `go-ddd-adapters` throwaway branch `spike/jobs-asynq`;
-branch `feat/ports-jobs` deleted local + remote; **NO tag** — tag gate still
-open). Prior: 2026-06-09 (`ports/idempotency` **v0.8.0 CORE TAG
+Last verified: 2026-06-16 Asia/Taipei (`ports/jobs` **v0.9.0 RELEASE IN
+PROGRESS** — contract merged via PR #22 (`728c9d0`); tag gate SATISFIED by the
+first adapter, `jobs/asynq` in `go-ddd-adapters` PR #29 (`1f8a685`, pins core
+pseudo-version `v0.8.1-0.20260616032638-784ef3ea2bcc`, passes (0)+(a)–(v)
+under -race); release-prep PR `release/v0.9.0-prep` open — CHANGELOG
+`[0.9.0]`, README `jobs/` `[v0.9.0]`, decisions.md tag-gate marked satisfied.
+Tag/Release + adapters dep-bump pending. See "Jobs Contract Cycle" below.)
+Prior: 2026-06-09 (`ports/idempotency` **v0.8.0 CORE TAG
 SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
 `b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
 `v0.8.0`, GitHub Release published as Latest at
@@ -57,7 +60,20 @@ workflow `26409070511`), adapters `v0.5.0` annotated tag (object
 (2026-05-26 00:08:32 Asia/Taipei) at
 https://github.com/slam0504/go-ddd-adapters/releases/tag/v0.5.0.
 
-## Jobs Contract Cycle: CONTRACT MERGED (PR #22, NO tag — tag gate open)
+## Jobs Contract Cycle: TAG GATE SATISFIED → v0.9.0 RELEASE IN PROGRESS
+
+**Tag gate SATISFIED 2026-06-16**: first production adapter — `jobs/asynq`
+(`jobsasynq`) over `hibiken/asynq v0.24.1` in `go-ddd-adapters` PR #29 (merge
+`1f8a685`), pinning core at pseudo-version
+`v0.8.1-0.20260616032638-784ef3ea2bcc` and passing all of `(0)+(a)–(v)` under
+`go test -race`. Version resolves to **v0.9.0** (additive minor). Core
+release-prep PR `release/v0.9.0-prep` opened (CHANGELOG `[Unreleased]`→
+`[0.9.0]`, README `jobs/` row `[v0.9.0]`, decisions.md tag-gate marked
+satisfied, state.md). **Remaining**: merge release-prep → annotated tag
+`v0.9.0` + GitHub Release; then adapters dep-bump (pseudo-version → `v0.9.0`)
++ adapters tag/Release to close the cross-repo cycle.
+
+## Jobs Contract Cycle: CONTRACT MERGED (PR #22, NO tag — historical)
 
 Next A-quadrant item after idempotency: background jobs (`ports/jobs`).
 Plan converged over 18 Codex REVISE rounds (base) + R19–R29 (incl. one manual
