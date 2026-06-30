@@ -53,11 +53,15 @@ const UnknownCount = -1
 type Result struct {
 	// Allowed MUST be exact — it is the decision itself.
 	Allowed bool
-	// RetryAfter MUST be present. When Allowed it MUST be 0. When !Allowed it
-	// MUST be a floor: a "no sooner than" lower bound — retrying before it
-	// elapses is guaranteed still denied. Over-estimating is safe (client waits
-	// longer); under-estimating is a bug. Same single-direction floor as jobs
-	// Job.ProcessAt.
+	// RetryAfter MUST be present. When Allowed it MUST be 0. When !Allowed it is
+	// a conservative wait hint: it MUST NOT be less than the limiter's known
+	// earliest-retry time (under-estimating is a bug), and MAY be larger (a
+	// conservative over-estimate is fine — the client just waits longer).
+	// Retrying before it elapses carries NO success guarantee; it is NOT a
+	// guarantee of denial. Per IETF draft-ietf-httpapi-ratelimit-headers-11,
+	// reset/retry timing is a hint (a server MAY alter quota between requests),
+	// not a hard "denied until then" promise. Reports on the safe side like jobs
+	// Job.ProcessAt's "no earlier than", but without ProcessAt's hard guarantee.
 	RetryAfter time.Duration
 	// Limit / Remaining / ResetAt are accurate-or-absent advisory metadata:
 	// each is either a value the limiter genuinely computed (carrying that
@@ -68,6 +72,15 @@ type Result struct {
 	// Remaining is TOCTOU-stale the instant it is read). A consumer MUST omit
 	// the corresponding header when the value is absent (see HasLimit /
 	// HasRemaining / ResetAt.IsZero) — it MUST NOT serialise UnknownCount.
+	//
+	// Multi-policy projection: a limiter MAY enforce several quota policies at
+	// once (IETF draft-11 RateLimit-Policy is a list, e.g. 50/60s AND
+	// 1000/3600s). Result carries at most ONE policy's metadata, so the adapter
+	// MUST project the policy that BOUND this decision — on a denial, the policy
+	// that denied; on an allow, the most-constraining policy it can honestly
+	// represent. If no single policy is a faithful representative, the fields
+	// MUST be absent rather than a fabricated blend. Surfacing every policy is an
+	// adapter-layer concern, outside this single-Result contract.
 	Limit     int       // UnknownCount means absent.
 	Remaining int       // UnknownCount means absent.
 	ResetAt   time.Time // IsZero means absent.
@@ -84,9 +97,13 @@ func (r Result) HasRemaining() bool { return r.Remaining >= 0 }
 type Limiter interface {
 	// Allow reports whether key may proceed right now, as Result data. Ordinary
 	// quota exhaustion is NOT an error: it MUST return Result{Allowed:false}
-	// (with a RetryAfter floor), nil. errorsx.CodeRateLimited is NOT used for
-	// ordinary denial — it exists only so a transport adapter can translate an
-	// Allowed==false decision into HTTP 429; the Limiter itself never returns it.
+	// (with a RetryAfter wait hint), nil. The Limiter NEVER returns
+	// errorsx.CodeRateLimited for ordinary denial. Because Allowed==false is data
+	// (there is no error value), HTTP middleware SHOULD emit 429 directly from the
+	// Allowed==false decision rather than route it through an error-translation
+	// pipeline (httpx.Translate takes an error, which this is not); only if a
+	// particular transport pipeline requires an error object should it mint a
+	// CodeRateLimited error inside that adapter.
 	//
 	// A non-nil error means the limiter could not reach a decision, in two
 	// classes with fixed precedence (same shape as jobs.Enqueuer):
@@ -108,12 +125,14 @@ type Limiter interface {
 | 欄位 | 義務 |
 |---|---|
 | `Allowed` | MUST 精確 —— 決策本身 |
-| `RetryAfter` | MUST present;`Allowed`→0;`!Allowed`→**floor**(no-sooner-than,高估安全、低估是 bug)。沿用 jobs `ProcessAt` 單向 floor |
+| `RetryAfter` | MUST present;`Allowed`→0;`!Allowed`→**保守等待 hint**:不低於 limiter 已知最早可重試時間(低估是 bug)、可高估;在它之前 retry **無成功保證**(非保證 denied,對齊 IETF draft-11「reset 是 hint 非硬保證」) |
 | `Limit`/`Remaining`/`ResetAt` | **accurate-or-absent**(真值含演算法固有精度 or sentinel,禁捏造)+ **advisory-only**(consumer 只發 header、MUST NOT 用於 allow/deny);`!HasX()`/`IsZero()` 時 consumer MUST omit header(不得序列化 `UnknownCount`) |
 
 **overflow 規則**:當 upstream policy / HTTP header 表達的數值超出本機 `int` 可靠範圍,adapter MUST 將該欄位設為 `UnknownCount`(absent),**不得截斷或飽和成假值** —— 這是 accurate-or-absent 的延伸(假值即捏造)。
 
-**denial 不走 error channel**:正常限流 MUST 回 `Result{Allowed:false}, nil`;`errorsx.CodeRateLimited`(已存在於 `pkg/errorsx`,`StatusFromCode` 映射 429)**不用於** ordinary limiter denial,僅供 transport adapter 把 `Allowed==false` 翻成 HTTP 429。明文寫入 doc,避免 adapter 作者照名字回 error。
+**denial 不走 error channel**:正常限流 MUST 回 `Result{Allowed:false}, nil`。`errorsx.CodeRateLimited`(已存在於 `pkg/errorsx`,`StatusFromCode` 映射 429)**Limiter 永不回傳**。因 `Allowed==false` 是 data(無 error 物件),HTTP middleware 應**直接從 `Allowed==false` 發 429**,不要走 `httpx.Translate(err)` 這類 error pipeline;僅當某 transport pipeline 硬需 error 物件時,才在該 adapter 內部自造 `CodeRateLimited` error。
+
+**多 policy 投影**:limiter 可能同時套用多組 quota policy(IETF draft-11 `RateLimit-Policy` 是 list,如 50/60s AND 1000/3600s)。`Result` 只承載**一組** metadata,故 adapter MUST 投影**約束本次決策的那個 policy**(被拒時=觸發拒絕的 policy;放行時=能誠實表示的最受限 policy);若無單一 policy 可忠實代表 → 該欄 absent,不得折疊成捏造的混合值。完整多 policy 表達是 adapter 層的事。
 
 ## 4. error 語意(沿用 jobs 兩類 + precedence)
 
@@ -125,14 +144,14 @@ type Limiter interface {
 
 ## 5. `ratelimittest` conformance suite(只測不依賴 wall-clock 的不變式)
 
-對齊 `jobstest`/`idempotencytest` 的「只出可確定性測試那半」紀律。`RunContract` 接受 factory,要求配置成 deterministic profile(同 key 第 1 次 allowed、第 2 次 denied)。
+對齊 `jobstest`/`idempotencytest` 的「只出可確定性測試那半」紀律。`RunContract` 接受 factory,**每個 subtest 取一個 fresh、isolated limiter**(對齊 jobstest/idempotencytest,避免 suite 間狀態污染),要求配置成 deterministic profile(同 key 第 1 次 allowed、第 2 次 denied)。
 
 **測:**
 - 空 key → `CodeInvalidArgument` + precedence
 - pre-cancelled / pre-expired ctx → `errors.Is`
 - same-key depletion(不睡覺連打,第 2 次 `Allowed=false, err=nil`)
 - key isolation(A 耗盡不影響 B 第一次 `Allow`)
-- **`RetryAfter` invariant**:`Allowed`→`RetryAfter==0`;`!Allowed && err==nil`→`RetryAfter>0`(擋掉 `Result{}, nil` 的 zero-value 退化:denied 卻無 no-sooner-than floor)
+- **`RetryAfter` invariant**:`Allowed`→`RetryAfter==0`;`!Allowed && err==nil`→`RetryAfter>0`(擋掉 `Result{}, nil` 的 zero-value 退化:denied 卻無等待 hint)
 - metadata shape:`Limit`/`Remaining` 僅 `UnknownCount` 或非負;均 known 時 `Remaining≤Limit`;`Remaining==0` 視為 known(非 absent)
 - denied-is-data-not-error(正常限流不得回 error)
 - `HasLimit`/`HasRemaining` 對 `UnknownCount`/`0` 的 executable spec
@@ -160,7 +179,8 @@ ports/ratelimit/ratelimittest/ratelimittest_test.go in-package reference limiter
 1. **介面回 `Result` 而非裸 bool** —— inbound 場景需要 `Retry-After` + quota hints;裸 bool 會逼每個 middleware 另開 side channel 搬 header 資料,抵銷「出一個 core 契約」的意義。
 2. **`Result` 用扁平 value struct + `-1`/`IsZero` sentinel + `HasX` 謂詞**,不用 `*int` 或 accessor-only —— 對齊 `pkg/pagination.Page.Total` 的既有 `-1` 先例與 repo dominant 的 value-struct 風格;metadata 是 advisory 而非授權/資安不變式,不值得付 constructor/accessor 稅。
 3. **accurate-or-absent + advisory-only**(而非「best-effort」)—— 「best-effort」是契約氣味,會誘 adapter 塞近似垃圾、consumer 拿去當真;「禁捏造 + 只發 header + 不可決策」才是可驗證義務,且讓全部演算法(含分散式近似)可 conform。
-4. **`RetryAfter` 用 floor 語意**(而非精確值)—— 近似/分散式演算法能誠實滿足下界但無法滿足精確值;floor 讓 `RetryAfter` 留在「全演算法可 conform」這側。
+4. **`RetryAfter` 用保守 hint 語意**(而非精確值,也非「之前保證 denied」的 floor)—— 近似/分散式演算法能誠實滿足「不低於最早可重試」的保守上估,但無法滿足精確值;且 IETF draft-11 明示 reset/retry 是 hint、server 可隨請求調整 quota,故不宣稱「之前一定被拒」。保守 hint 讓 `RetryAfter` 留在「全演算法可 conform」這側。
 5. **空 key → `CodeInvalidArgument`** —— fail-loud;空 key 是 caller 漏建 partition key,silent 共用一桶是最難查的限流 bug。
-6. **不綁死 header spelling** —— IETF rate-limit header spec 仍是 Internet-Draft(會演化);doc 只描述語意(`Retry-After` + quota hints),不寫死 `RateLimit-*` 欄位名或 spec 版本。
-   - 註:draft 現況(以 `RateLimit`/`RateLimit-Policy` 為中心)未在本次獨立查證;但「core 不綁 header spelling」無論 draft 如何演化都成立,故此決策不依賴該查證。
+6. **不綁死 header spelling** —— IETF rate-limit header spec 仍是 Internet-Draft(`draft-ietf-httpapi-ratelimit-headers-11`,2026-05-23,會演化);doc 只描述語意(`Retry-After` + quota hints),不寫死 `RateLimit-*` 欄位名或 spec 版本。
+   - 已查證 draft-11(WebFetch,2026-06-30):支援 **multiple quota policies**(`RateLimit-Policy` 為 list)→ 催生 §3 多 policy 投影規則;reset/retry 時間是 **hint 非硬保證**(原文「Clients MUST NOT assume that a positive available quota is a guarantee that further requests will be served」)→ 修正 `RetryAfter` 語意;metadata 為 **advisory hints**(「MUST NOT consider the available quota parameter as a service level agreement」)→ 支撐 advisory-only 義務。
+7. **單一 `Result` + 投影 binding policy**(而非 `Result` 攜帶 policy 陣列)—— core 保持單組 metadata 的最小表面積;多 policy 並存時投影「約束本次決策」的那組、無單一忠實代表則 absent。完整 policy 陣列表達(若某 service 需要)是 adapter 層擴充,不汙染 core 契約。
