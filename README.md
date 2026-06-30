@@ -25,11 +25,12 @@ application/
   usecase/                Lightweight UseCase[D, R] + AsCommandHandler / AsQueryHandler [v0.2.0]
 eventsourcing/            EventStore, SnapshotStore, Projector
 eventbus/                 Publisher/Subscriber (watermill contract), Outbox, Inbox
-ports/                    Infra interfaces (logger, cache, database, storage, httpclient, observability, health, auth, idempotency, jobs)
+ports/                    Infra interfaces (logger, cache, database, storage, httpclient, observability, health, auth, idempotency, jobs, ratelimit)
   health/                 Liveness/readiness probe contract [v0.5.0]
   auth/                   AuthN + AuthZ contract: Identity + TokenVerifier + Authorizer [v0.7.0]
   idempotency/            Inbound-request idempotency: Store + Reservation + Status (lease-guarded claim) [v0.8.0]
   jobs/                   Background jobs: Enqueuer + Worker + Job/Task (at-least-once, run-at scheduling) [v0.9.0]
+  ratelimit/              Inbound request-throttling: Limiter.Allow → Result (decision-as-data + advisory metadata) [unreleased, tag-gate]
 transport/                Server contracts (http, grpc, graphql) — no library deps
   grpc/                   + interceptor combinators + errorsx → grpc Status mapping [v0.2.0]
   graphql/                + Loader contract, Relay cursor codec, FilterInput → Specification [v0.2.0]
