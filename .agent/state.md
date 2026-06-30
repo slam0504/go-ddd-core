@@ -9,7 +9,26 @@ returns `v0.9.0`). Tag gate satisfied by the first adapter, `jobs/asynq` in
 `go-ddd-adapters` PR #29 (`1f8a685`), passing (0)+(a)–(v) under -race. Adapters
 dep-bump PR #30 (`040228b`) moved core pseudo-version → `v0.9.0` (root +
 examples/orders), adapters annotated tag `v0.9.0` (→ `040228b`) + GitHub
-Release Latest. See "Jobs Contract Cycle" below.) Prior: 2026-06-09
+Release Latest. See "Jobs Contract Cycle" below.)
+
+**`ports/ratelimit` — CONTRACT + SUITE SHIPPED (PR #26, unreleased, tag-gate)** —
+the last A-quadrant gap in `docs/roadmap.md`. Contract + `ratelimittest` suite
+implemented via the full superpowers flow (design spec
+`docs/superpowers/specs/2026-06-30-ports-ratelimit-design.md`, plan
+`docs/superpowers/plans/2026-06-30-ports-ratelimit.md`); branch
+`feat/ports-ratelimit`, PR #26 (base main, NO tag — contract-merge, same pattern
+as jobs #22 / idempotency #17), both CI checks green. Inbound request-throttling
+`Limiter.Allow(ctx, key) (Result, error)`: decision is DATA (`Result.Allowed`),
+not error; `RetryAfter` is a CONSERVATIVE WAIT HINT (allowed→0, denied→>0, no
+lower than known earliest-retry, may over-estimate, NOT a denial guarantee — per
+IETF draft-ietf-httpapi-ratelimit-headers-11); `Limit`/`Remaining`/`ResetAt`
+accurate-or-absent advisory-only (`UnknownCount = -1` / `IsZero` sentinels;
+real 0 is known); empty key → `CodeInvalidArgument` (precedence
+empty-key→ctx→backend); multi-policy projection of the binding policy.
+`ratelimittest.RunContract` deterministic-only, 9 subtests. **Tag-gate**:
+awaiting first adapter consumer (e.g. redis_rate / GCRA) to cut the tag.
+
+Prior: 2026-06-09
 (`ports/idempotency` **v0.8.0 CORE TAG
 SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
 `b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
