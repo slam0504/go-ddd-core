@@ -62,6 +62,19 @@ func RunContract(t *testing.T, factory Factory) {
 		}
 	})
 
+	t.Run("EmptyKeyPrecedesExpiredDeadline", func(t *testing.T) {
+		l := factory(t)
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		defer cancel()
+		_, err := l.Allow(ctx, "")
+		if code := errorsx.CodeOf(err); code != errorsx.CodeInvalidArgument {
+			t.Fatalf("empty key + expired deadline: code = %v, want CodeInvalidArgument — validation precedes ctx observation (err=%v)", code, err)
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			t.Fatal("empty key + expired deadline returned the ctx error; fixed precedence is empty-key first")
+		}
+	})
+
 	t.Run("PreCancelledCtx", func(t *testing.T) {
 		l := factory(t)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -137,18 +150,26 @@ func RunContract(t *testing.T, factory Factory) {
 
 	t.Run("MetadataShape", func(t *testing.T) {
 		l := factory(t)
-		res, err := l.Allow(context.Background(), keyA)
+		check := func(res ratelimit.Result, label string) {
+			if res.Limit < 0 && res.Limit != ratelimit.UnknownCount {
+				t.Fatalf("%s: Result.Limit = %d: a negative Limit must be exactly UnknownCount (%d), never another negative", label, res.Limit, ratelimit.UnknownCount)
+			}
+			if res.Remaining < 0 && res.Remaining != ratelimit.UnknownCount {
+				t.Fatalf("%s: Result.Remaining = %d: a negative Remaining must be exactly UnknownCount (%d)", label, res.Remaining, ratelimit.UnknownCount)
+			}
+			if res.HasLimit() && res.HasRemaining() && res.Remaining > res.Limit {
+				t.Fatalf("%s: Remaining (%d) > Limit (%d) while both known; remaining can never exceed the limit", label, res.Remaining, res.Limit)
+			}
+		}
+		allowed, err := l.Allow(context.Background(), keyA)
 		if err != nil {
-			t.Fatalf("Allow: %v", err)
+			t.Fatalf("first Allow: %v", err)
 		}
-		if res.Limit < 0 && res.Limit != ratelimit.UnknownCount {
-			t.Fatalf("Result.Limit = %d: a negative Limit must be exactly UnknownCount (%d), never another negative", res.Limit, ratelimit.UnknownCount)
+		check(allowed, "allowed result")
+		denied, err := l.Allow(context.Background(), keyA)
+		if err != nil {
+			t.Fatalf("second Allow: %v — denial must be data, not an error", err)
 		}
-		if res.Remaining < 0 && res.Remaining != ratelimit.UnknownCount {
-			t.Fatalf("Result.Remaining = %d: a negative Remaining must be exactly UnknownCount (%d)", res.Remaining, ratelimit.UnknownCount)
-		}
-		if res.HasLimit() && res.HasRemaining() && res.Remaining > res.Limit {
-			t.Fatalf("Remaining (%d) > Limit (%d) while both known; remaining can never exceed the limit", res.Remaining, res.Limit)
-		}
+		check(denied, "denied result")
 	})
 }
