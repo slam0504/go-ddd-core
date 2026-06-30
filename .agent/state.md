@@ -9,7 +9,18 @@ returns `v0.9.0`). Tag gate satisfied by the first adapter, `jobs/asynq` in
 `go-ddd-adapters` PR #29 (`1f8a685`), passing (0)+(a)–(v) under -race. Adapters
 dep-bump PR #30 (`040228b`) moved core pseudo-version → `v0.9.0` (root +
 examples/orders), adapters annotated tag `v0.9.0` (→ `040228b`) + GitHub
-Release Latest. See "Jobs Contract Cycle" below.) Prior: 2026-06-09
+Release Latest. See "Jobs Contract Cycle" below.)
+
+**Next A-quadrant item: `ports/ratelimit`** — the last A-quadrant gap in
+`docs/roadmap.md`; contract design DONE 2026-06-30 (design doc
+`docs/superpowers/specs/2026-06-30-ports-ratelimit-design.md`, branch
+`feat/ports-ratelimit`), awaiting implementation. Inbound request-throttling
+`Limiter.Allow(ctx, key) (Result, error)`: decision is DATA (`Result.Allowed`)
+not error; `RetryAfter` floor; `Limit`/`Remaining`/`ResetAt` accurate-or-absent
+advisory-only (`UnknownCount = -1` / `IsZero` sentinels); empty key →
+`CodeInvalidArgument`; `ratelimittest` deterministic-only conformance suite.
+
+Prior: 2026-06-09
 (`ports/idempotency` **v0.8.0 CORE TAG
 SHIPPED** — annotated tag `v0.8.0` (object `202d437` → release-prep merge commit
 `b0a0e74`, PR #19) pushed to origin; `gh api repos/.../releases/latest` returns
