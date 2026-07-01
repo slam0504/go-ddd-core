@@ -41,6 +41,9 @@ type DeliveryBounds struct {
 	// future delay." The suite schedules ProcessAt = now + ProcessAtDelay, asserts
 	// no delivery before it, and eventual delivery within ProcessAtDelay +
 	// DeliverWithin. Not a core default — the adapter's declared scheduling knob.
+	// The declared value MUST cover the scheduler granularity, the worker poll
+	// interval, and the expected backend-clock skew in the test environment; a
+	// too-small value makes the not-before assertion flaky.
 	ProcessAtDelay time.Duration
 }
 
@@ -90,11 +93,11 @@ func RunDeliveryContract(t *testing.T, factory DeliveryFactory)
 | `FailedAttemptRedelivered` | (a) | handler `atomic` 計數:第 1 次回 error、第 2 次 signal channel + nil。等 `RedeliverWithin`,斷言 attempts≥2。**降調**:只證「失敗後 redelivery」,不宣稱 concurrent-duplicate tolerance(那需內省)。 |
 | `NotBeforeProcessAt` | (b) | `ProcessAt = now + ProcessAtDelay`;handler signal fire-time;斷言 fire-time 不 before ProcessAt;等 `ProcessAtDelay + DeliverWithin`。 |
 | `PastProcessAtEligible` | (p) | `ProcessAt` 設過去;handler 在 `DeliverWithin` 內 fire。 |
-| `RunReturnsNilOnCancel` | (c) | 啟 Worker、cancel、`assertRunNilWithin(ShutdownWithin)`(ctx 已取消時的 endpoint A)。 |
+| `RunReturnsNilOnCancel` | (c) | enqueue 一個 blocking-handler job:handler signal started 後 block 於 release channel(**刻意忽略 ctx** = straggler);等 started、**再** cancel、`assertRunNilWithin(ShutdownWithin)`;`t.Cleanup` 關閉 release。先讓 worker 真正 running 才證 endpoint A(running-worker cancel→nil,且 liveness 贏過 graceful drain),避免 start-then-immediate-cancel 命中 pre-cancel fast path 的 vacuous 測法。與 (j)(ctx-observing handler)互補不重複。 |
 | `PayloadMutationIsolated` | (d) | 第 1 次 attempt 就地改 `task.Payload` 後 fail;第 2 次 attempt 斷言看到原始 bytes。需 retry。 |
 | `IDStableAcrossRedeliveries` | (e) | 每次 attempt 收集 `task.ID`;斷言全部 == `JobInfo.ID`。需 retry。 |
 | `HandlerCtxCancelledOnShutdown` | (j) | handler signal 進場後 block 於 `<-hctx.Done()`;cancel Run;斷言 handler ctx 被取消;`assertRunNilWithin`。 |
-| `ExactTypeDispatchNoPrefix` | (k) | 註冊 `"t"` 的 handler;enqueue 一個 prefix-鄰近型別(如 `"t:x"`)不得被 `"t"` handler 收(等 `DeliverWithin` 確認未 fire);對照:`"t"` job 必須 fire。 |
+| `ExactTypeDispatchNoPrefix` | (k) | 註冊 `"t"` 的 handler;**先** enqueue exact `"t"` 確認 handler fire、drain signal;**再** enqueue prefix-鄰近型別 `"t:x"`,在 `DeliverWithin` 內確認 handler **沒有第二次** fire。exact-first 只觀察「exact handler 不收 prefix job」,不依賴 unhandled-`"t:x"` 的 adapter policy(屬刻意排除的 (u)),也避免某些 queue 的 unhandled/retry policy 阻塞後續 exact job。 |
 | `DuplicateRegisterKeepsOriginal` | (o) | 註冊 h1 for `"t"`;再註冊 h2 for `"t"` → `CodeAlreadyExists`;enqueue `"t"` → h1 收、h2 不收。 |
 | `NewWorkerDeliversAfterStop` | (r) | enqueue `ProcessAt = now + ProcessAtDelay`(確保 w1 取消前不 eligible);`NewWorker()` 造 w1、啟動後即 cancel、`assertRunNilWithin`;`NewWorker()` 造 w2 → 在 `ProcessAtDelay + DeliverWithin` 內 delivery。 |
 | `ConcurrentEnqueueSmoke` | (l) | N goroutine 並發 `Enqueue`(-race 乾淨);cancel;`assertRunNilWithin`。**不 assert exact count**。 |
