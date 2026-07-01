@@ -462,3 +462,82 @@ half of `jobstest` from the proven common semantics. The pseudo-version-only
 compensating control held until the adapter landed; with PR #29 merged and
 `(0)+(a)–(v)` green, core cut **v0.9.0** (release-prep PR + annotated tag +
 GitHub Release as Latest), same 2-step cross-repo close as v0.5.0–v0.8.0.
+
+## Rate Limiting Contract (`ports/ratelimit`, post-v0.9.0)
+
+- **Shape**: `Limiter.Allow(ctx, key) (Result, error)` — single-method thin
+  contract. The throttling DECISION is data (`Result.Allowed`), never an error;
+  ordinary quota exhaustion returns `Result{Allowed:false}, nil`. `errorsx.CodeRateLimited`
+  (pre-existing → 429) is a transport-layer mapping the limiter NEVER returns.
+- **`Result`**: flat comparable value struct `{Allowed, RetryAfter, Limit,
+  Remaining, ResetAt}` + `HasLimit()`/`HasRemaining()` predicates. Same
+  "advisory metadata + accurate-or-absent sentinel" shape as
+  `pagination.Page.Total`'s `-1`: `UnknownCount = -1` marks `Limit`/`Remaining`
+  absent, `ResetAt.IsZero()` marks it absent, a real `0` is a KNOWN value (absent
+  must be set explicitly — the zero-value `Result{}` reports counts as known 0).
+- **`RetryAfter` is a conservative wait hint, not a floor-guarantee**: allowed→0,
+  denied→>0, no lower than the limiter's known earliest-retry (under-estimate is a
+  bug, over-estimate is safe), and retrying before it has NO success guarantee —
+  NOT a guarantee of denial. Per IETF draft-ietf-httpapi-ratelimit-headers-11,
+  reset/retry timing is a hint (the server MAY alter quota between requests), not a
+  hard "denied until then" promise. (A round-2 review caught the original
+  "floor + over-estimate safe" wording as self-contradictory; the fix was verified
+  against draft-11.)
+- **advisory-only + multi-policy projection**: `Limit`/`Remaining`/`ResetAt` are
+  advisory — consumers surface them as headers but MUST NOT use them for allow/deny
+  (that is `Allowed`'s job; `Remaining` is TOCTOU-stale on read). A multi-policy
+  limiter (draft-11 `RateLimit-Policy` is a list) projects the policy that BOUND
+  this decision, else absent — never a fabricated blend. Overflow (an upstream
+  value exceeding `int`) → `UnknownCount`, not a saturated fake.
+- **Two-class error + fixed precedence** (mirrors `jobs.Enqueuer`): empty key
+  (`CodeInvalidArgument` — a missing partition key, not an anonymous caller;
+  fail-loud, else distinct callers collide into one bucket) → pre-cancelled/expired
+  ctx (`errors.Is` Canceled/DeadlineExceeded, no backend contact) → backend
+  (coded `errorsx`, never `CodeUnknown`).
+- **Deliberately excluded (YAGNI until consumer evidence)**: outbound quota /
+  blocking `Wait`·`Reserve` (deferred to a future httpclient-driven consumer),
+  `AllowN`/cost, `LimiterFunc` (a limiter is stateful — no use for a func-adapter),
+  exact timing semantics (refill / reset instant / RetryAfter decay — adapter-level,
+  not deterministically testable).
+- **Conformance suite scope**: `ratelimittest.RunContract` is deterministic-only
+  (mirrors `jobstest`'s synchronous-only boundary) — asserts empty-key validation
+  + precedence, ctx handling, depletion, denial-is-data, the `RetryAfter` invariant,
+  key isolation, and accurate-or-absent metadata shape on allowed AND denied
+  results; never sleeps. Window recovery / exact reset / high-concurrency exact
+  counts are adapter real-backend intent tests.
+
+### Tag gate (SATISFIED 2026-07-01 → v0.10.0)
+
+Satisfied by the first production adapter — a distributed Redis GCRA limiter
+(`ratelimit/redisrate`, package `redisratelimit`) wrapping
+`github.com/go-redis/redis_rate/v10` in `go-ddd-adapters` PR #31 (merge
+`e41d80a`), which pins core at the pseudo-version
+`v0.9.1-0.20260630075935-b882796e716c` (core `b882796`, PR #26). The version
+resolved to **v0.10.0** (additive minor; the contract is an exported API
+addition).
+
+The first production adapter passes, all under `go test -race`:
+
+- (0) `ports/ratelimit/ratelimittest.RunContract` green against testcontainers
+  Redis (per-factory unique namespace so a shared container survives `-count>1` /
+  `-race` reruns);
+- (a) denial-is-data: quota exhaustion returns `Result{Allowed:false}, nil`; the
+  adapter never mints `CodeRateLimited`;
+- (b) fixed error precedence: empty key (`CodeInvalidArgument`, no backend) →
+  pre-cancelled/expired ctx (verbatim ctx error, no backend) → backend (coded
+  `errorsx`, never `CodeUnknown`; unreachable → `CodeUnavailable`, unclassifiable
+  → `CodeInternal`);
+- (c) `RetryAfter` explicit-zero on allow (`redis_rate` returns `-1` when allowed;
+  the adapter never reads it on the allow path — structural, guarded end-to-end);
+- (d) `Limit`/`Remaining` project the GCRA instantaneous burst; `ResetAt` absent
+  (avoids client-clock skew);
+- (e) prefix-free key encoding (`len(prefix):prefix:key`) proven by an adversarial
+  injectivity test on colliding tuples (the class of bug `idempotency/redis` fixed
+  in v0.8.0);
+- (f) integration under `-race` against `redis:7-alpine`: Redis-unavailable →
+  `CodeUnavailable`, recovery-after-refill, key-prefix isolation end-to-end.
+
+The pseudo-version-only compensating control held until the adapter landed; with
+PR #31 merged and the acceptance criteria green, core cut **v0.10.0** (release-prep
+PR + annotated tag + GitHub Release as Latest), same 2-step cross-repo close as
+v0.5.0–v0.9.0.
