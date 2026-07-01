@@ -7,12 +7,15 @@
 // deadline handling at Enqueue, and Register validation semantics. It never
 // calls Worker.Run, sets no timers, and waits on nothing, so it cannot flake.
 //
-// Delivery-side invariants (payload snapshot isolation, exact-type dispatch,
-// at-least-once redelivery, shutdown recoverability) need a running worker
-// and backend-specific observation, so they are NOT in this suite: adapters
-// must cover them with their own intent tests (see the tag-gate acceptance
-// criteria recorded in the repository's .agent/decisions.md), and core
-// demonstrates them against a local fake in ports/jobs's own tests.
+// The interface-observable half of the delivery/timing invariants (failed-attempt
+// redelivery, not-before-ProcessAt, exact-type dispatch, payload-copy isolation,
+// stable Task.ID, handler-ctx-cancelled-on-shutdown, Run-returns-nil-on-cancel,
+// per-key isolation across workers) lives in RunDeliveryContract, which runs a
+// real Worker against adapter-declared timing bounds. Introspection- and
+// fault-injection-bound invariants (recoverable-state classification, retention,
+// accepted-but-ack-lost, unreachable backend, unhandled-job policy) remain in the
+// adapter's own tag-gate intent tests (see .agent/decisions.md); core demonstrates
+// them against a local fake in ports/jobs's own tests.
 package jobstest
 
 import (
