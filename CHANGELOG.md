@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-01
+
+Inbound request-throttling contract. Core adds `ports/ratelimit` — a single
+`Limiter.Allow(ctx, key) (Result, error)` that answers "may this key proceed
+right now?", returning the throttling decision as data (`Result.Allowed`), never
+as an error. `Result` also carries accurate-or-absent advisory quota metadata
+(a `RetryAfter` conservative wait hint plus `Limit`/`Remaining`/`ResetAt` with
+`UnknownCount`/`IsZero` sentinels) for HTTP `Retry-After` / rate-limit hints; the
+throttling algorithm, rate/burst/window config, and storage all live in adapters.
+The tag gate (v0.5.0–v0.9.0 discipline) was satisfied by the first adapter
+consumer — a distributed Redis GCRA limiter (`ratelimit/redisrate` over
+`redis_rate/v10`) in `go-ddd-adapters` (PR #31) that passes core's
+`ratelimittest.RunContract` against testcontainers Redis plus real-backend
+integration checks (recovery-after-refill, `CodeUnavailable` on outage, key-prefix
+isolation) under `-race`. Contract wording was verified against IETF
+draft-ietf-httpapi-ratelimit-headers-11. v0.10.0 is an additive minor.
+
+### Added
+
+- `ports/ratelimit` inbound request-throttling contract:
+  - `Limiter.Allow(ctx, key) (Result, error)` — the throttling decision is DATA
+    (`Result.Allowed`), never an error; ordinary quota exhaustion returns
+    `Result{Allowed:false}, nil` (the limiter never mints `errorsx.CodeRateLimited`,
+    which stays a transport-layer 429 mapping). Two-class error model with fixed
+    precedence: empty key → `CodeInvalidArgument` (a missing partition key, not an
+    anonymous caller); ctx observed before backend (`Canceled`/`DeadlineExceeded`);
+    backend failures always carry a coded `errorsx` code, never `CodeUnknown`
+    (unreachable → `CodeUnavailable`, unclassifiable → `CodeInternal`).
+  - `Result{Allowed, RetryAfter, Limit, Remaining, ResetAt}` flat comparable value
+    struct with `HasLimit()`/`HasRemaining()` predicates. `RetryAfter` is a
+    conservative wait hint (allowed→0, denied→>0, no lower than the known
+    earliest-retry, may over-estimate — NOT a denial guarantee, per IETF draft-11).
+    `Limit`/`Remaining`/`ResetAt` are accurate-or-absent advisory-only metadata
+    (`UnknownCount = -1` / `IsZero` sentinels; a real 0 is known, absent must be
+    explicit); consumers may surface them as headers but MUST NOT use them for
+    allow/deny. Multi-policy limiters project the policy that bound the decision,
+    else absent.
+- `ports/ratelimit/ratelimittest` exported deterministic-only conformance suite
+  (`Factory`/`RunContract`, fresh isolated limiter per subtest): empty-key
+  validation + precedence over ctx errors (Canceled and DeadlineExceeded),
+  pre-cancelled/expired ctx, first-allowed-then-denied depletion, denial-is-data,
+  the `RetryAfter` invariant, per-key isolation, and accurate-or-absent metadata
+  shape on both the allowed and denied result — never sleeps or uses a timer, so
+  it cannot flake. Window recovery / exact reset timing / high-concurrency exact
+  counts are adapter-level (real-backend) concerns.
+
 ## [0.9.0] - 2026-06-16
 
 Background-jobs contract. Core adds `ports/jobs` — enqueuing a unit of work to
