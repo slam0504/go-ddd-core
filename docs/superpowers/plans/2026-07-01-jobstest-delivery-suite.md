@@ -148,11 +148,12 @@ func (e *refEnqueuer) Enqueue(ctx context.Context, job jobs.Job) (jobs.JobInfo, 
 }
 
 type refWorker struct {
-	store      *refStore
-	mu         sync.Mutex
-	handlers   map[string]jobs.Handler
-	retryDelay time.Duration
-	poll       time.Duration
+	store       *refStore
+	mu          sync.Mutex
+	handlers    map[string]jobs.Handler
+	retryDelay  time.Duration
+	poll        time.Duration
+	dropOnError bool // test knob: if true, a failed handler is dropped (no retry)
 }
 
 func (w *refWorker) Register(jobType string, h jobs.Handler) error {
@@ -202,10 +203,10 @@ func (w *refWorker) Run(ctx context.Context) error {
 			}
 			go func(c claimed, h jobs.Handler) {
 				task := jobs.Task{ID: c.id, Type: c.typ, Payload: c.payload}
-				if err := h.Handle(ctx, task); err != nil {
+				if err := h.Handle(ctx, task); err != nil && !w.dropOnError {
 					w.store.retry(c.id, w.retryDelay, time.Now())
 				} else {
-					w.store.complete(c.id)
+					w.store.complete(c.id) // success, or (dropOnError) a dropped failure
 				}
 			}(c, h)
 		}
@@ -488,49 +489,25 @@ EOF
 Append to `ports/jobs/jobstest/delivery_test.go`:
 
 ```go
-// noRetryFixture is newRefFixture with a Worker that does NOT redeliver a failed
-// handler (it drops it) — must make FailedAttemptRedelivered FAIL.
+// noRetryFixture is newRefFixture with a Worker whose dropOnError knob is set:
+// a failed handler attempt is DROPPED instead of redelivered. This must make
+// FailedAttemptRedelivered (and the other retry-dependent subtests) FAIL,
+// proving the suite is non-vacuous. Reuses refWorker via the knob — no
+// duplicated Run loop.
 func noRetryFixture(t *testing.T) jobstest.DeliveryFixture {
 	t.Helper()
 	fx := newRefFixture(t)
 	store := fx.Enqueuer.(*refEnqueuer).store
 	fx.NewWorker = func() jobs.Worker {
-		return &noRetryWorker{refWorker{store: store, handlers: map[string]jobs.Handler{}, poll: 10 * time.Millisecond}}
-	}
-	return fx
-}
-
-type noRetryWorker struct{ refWorker }
-
-func (w *noRetryWorker) Run(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return nil
-	}
-	t := time.NewTicker(w.poll)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-t.C:
-			c, ok := w.store.claim(time.Now(), w.has)
-			if !ok {
-				continue
-			}
-			h := w.handlerFor(c.typ)
-			if h == nil {
-				continue
-			}
-			go func(c claimed, h jobs.Handler) {
-				task := jobs.Task{ID: c.id, Type: c.typ, Payload: c.payload}
-				if err := h.Handle(ctx, task); err != nil {
-					w.store.complete(c.id) // BUG: drops the failed job instead of retrying
-				} else {
-					w.store.complete(c.id)
-				}
-			}(c, h)
+		return &refWorker{
+			store:       store,
+			handlers:    map[string]jobs.Handler{},
+			retryDelay:  20 * time.Millisecond,
+			poll:        10 * time.Millisecond,
+			dropOnError: true, // broken variant: no redelivery
 		}
 	}
+	return fx
 }
 
 func TestDeliveryContract_NonVacuous(t *testing.T) {
