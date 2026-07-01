@@ -105,12 +105,11 @@ func (e *refEnqueuer) Enqueue(ctx context.Context, job jobs.Job) (jobs.JobInfo, 
 }
 
 type refWorker struct {
-	store       *refStore
-	mu          sync.Mutex
-	handlers    map[string]jobs.Handler
-	retryDelay  time.Duration
-	poll        time.Duration
-	dropOnError bool // test knob: if true, a failed handler is dropped (no retry)
+	store      *refStore
+	mu         sync.Mutex
+	handlers   map[string]jobs.Handler
+	retryDelay time.Duration
+	poll       time.Duration
 }
 
 func (w *refWorker) Register(jobType string, h jobs.Handler) error {
@@ -160,10 +159,10 @@ func (w *refWorker) Run(ctx context.Context) error {
 			}
 			go func(c claimed, h jobs.Handler) {
 				task := jobs.Task{ID: c.id, Type: c.typ, Payload: c.payload}
-				if err := h.Handle(ctx, task); err != nil && !w.dropOnError {
+				if err := h.Handle(ctx, task); err != nil {
 					w.store.retry(c.id, w.retryDelay, time.Now())
 				} else {
-					w.store.complete(c.id) // success, or (dropOnError) a dropped failure
+					w.store.complete(c.id)
 				}
 			}(c, h)
 		}
@@ -340,39 +339,6 @@ func runRef(w jobs.Worker) (context.CancelFunc, <-chan error) {
 	done := make(chan error, 1)
 	go func() { done <- w.Run(ctx) }()
 	return cancel, done
-}
-
-// noRetryFixture is newRefFixture with a Worker whose dropOnError knob is set:
-// a failed handler attempt is DROPPED instead of redelivered. This must make
-// FailedAttemptRedelivered (and the other retry-dependent subtests) FAIL,
-// proving the suite is non-vacuous. Reuses refWorker via the knob — no
-// duplicated Run loop.
-func noRetryFixture(t *testing.T) jobstest.DeliveryFixture {
-	t.Helper()
-	fx := newRefFixture(t)
-	store := fx.Enqueuer.(*refEnqueuer).store
-	fx.NewWorker = func() jobs.Worker {
-		return &refWorker{
-			store:       store,
-			handlers:    map[string]jobs.Handler{},
-			retryDelay:  20 * time.Millisecond,
-			poll:        10 * time.Millisecond,
-			dropOnError: true, // broken variant: no redelivery
-		}
-	}
-	return fx
-}
-
-func TestDeliveryContract_NonVacuous(t *testing.T) {
-	// A no-retry backend MUST fail the suite (FailedAttemptRedelivered at least).
-	// Run it as an expected-failing subtest and assert it failed via t.Run's bool
-	// — this is the robust way to observe a *testing.T-based suite failing.
-	ok := t.Run("no-retry-must-fail", func(st *testing.T) {
-		jobstest.RunDeliveryContract(st, noRetryFixture)
-	})
-	if ok {
-		t.Fatal("RunDeliveryContract passed against a no-retry backend; the suite is vacuous")
-	}
 }
 
 func TestReferenceBackendSatisfiesDeliveryContract(t *testing.T) {

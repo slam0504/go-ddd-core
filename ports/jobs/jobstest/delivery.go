@@ -378,7 +378,7 @@ func RunDeliveryContract(t *testing.T, factory DeliveryFactory) {
 		mustRegister(t, w, "l:job", jobs.HandlerFunc(func(context.Context, jobs.Task) error { return nil }))
 		cancel, done := runWorker(w)
 		var wg sync.WaitGroup
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
