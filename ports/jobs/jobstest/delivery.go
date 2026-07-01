@@ -371,6 +371,11 @@ func RunDeliveryContract(t *testing.T, factory DeliveryFactory) {
 		}
 	})
 
+	// ConcurrentEnqueueSmoke is a race/shutdown smoke test, NOT a delivery-count
+	// assertion: it proves concurrent Enqueue is safe under -race and that Run
+	// shuts down cleanly afterward. It deliberately ignores Enqueue errors and
+	// asserts no delivery count (at-least-once coverage lives in the retry/
+	// depletion subtests above).
 	t.Run("ConcurrentEnqueueSmoke", func(t *testing.T) {
 		fx := factory(t)
 		fx.Bounds.validate(t)
