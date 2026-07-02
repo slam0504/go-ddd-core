@@ -559,3 +559,14 @@ The pseudo-version-only compensating control held until the adapter landed; with
 PR #31 merged and the acceptance criteria green, core cut **v0.10.0** (release-prep
 PR + annotated tag + GitHub Release as Latest), same 2-step cross-repo close as
 v0.5.0–v0.9.0.
+
+## Cache Conformance Suite (`ports/cache/cachetest`, post-v0.11.0)
+
+**Tag gate (SATISFIED 2026-07-02 → v0.12.0)**: satisfied by the first
+`ports/cache` production adapter — `cache/redis` in `go-ddd-adapters` (PR #33,
+merge `2c10eba`) — which ran `cachetest.RunContract` (15 subtests) green against
+real Redis in CI at pseudo-version pin
+`v0.11.1-0.20260702035204-128d9eb1932a` (core PR #33, merge `128d9eb`). Core
+cut **v0.12.0** (release-prep PR + annotated tag + GitHub Release as Latest),
+same 2-step cross-repo close as v0.5.0–v0.11.0. No adapters dep-bump required
+for the cachetest addition; existing adapters keep working against v0.11.0.
