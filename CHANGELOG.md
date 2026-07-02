@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Core-only release: the delivery/timing half of the `ports/jobs` conformance
 story, distilled from the semantics the first production adapter
-(`jobs/asynq`, v0.9.0 tag gate) proved. No contract surface change; additive
-exported test-helper API. No adapters dep-bump is required — existing adapters
-keep working against v0.10.0; future jobs adapters consume the new suite.
+(`jobs/asynq`, v0.9.0 tag gate) proved. Also removes the dangling
+`ports/cache.TypedCache[T]` generic and tightens the `ports/cache.Cache`
+godoc contract (breaking, zero known consumers). No adapters dep-bump is
+required for the jobs additions — existing adapters keep working against
+v0.10.0; future jobs adapters consume the new suite.
 
 ### Added
 
@@ -39,6 +41,17 @@ keep working against v0.10.0; future jobs adapters consume the new suite.
   a deliberate in-process bootstrap default — core is infrastructure-client-free,
   not literally interface-only — pointing at the recorded design boundary, so
   the exception reads as policy rather than architecture drift.
+- `ports/cache.Cache` godoc tightened: ctx must be non-nil; empty key →
+  `CodeInvalidArgument`; `ttl == 0` means no expiry, `ttl < 0` →
+  `CodeInvalidArgument`; explicit Set and read error-precedence ladders now
+  stated in the interface contract.
+
+### Removed
+
+- **BREAKING:** `ports/cache.TypedCache[T]` deleted — a dangling generic (no
+  constructor, no codec seam, unstated miss semantics) with zero known
+  consumers. The byte-level `cache.Cache` interface and `ErrMiss` are
+  unchanged.
 
 ## [0.10.0] - 2026-07-01
 
