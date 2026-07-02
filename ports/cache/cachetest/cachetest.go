@@ -176,6 +176,47 @@ func RunContract(t *testing.T, newCache Factory) {
 		}
 	})
 
+	t.Run("EmptyKeyPrecedesCancelledCtx", func(t *testing.T) {
+		c := newCache(t)
+		cancelled, cancel := context.WithCancel(ctx)
+		cancel()
+		assertEmptyKeyWins := func(name string, code errorsx.Code, err error) {
+			t.Helper()
+			if code != errorsx.CodeInvalidArgument {
+				t.Fatalf("%s empty key + cancelled ctx: CodeOf = %v, want CodeInvalidArgument — empty-key validation must precede ctx observation (err=%v)", name, code, err)
+			}
+			if errors.Is(err, context.Canceled) {
+				t.Fatalf("%s empty key + cancelled ctx returned ctx error; contract precedence is empty-key first", name)
+			}
+		}
+		_, gErr := c.Get(cancelled, "")
+		assertEmptyKeyWins("Get", errorsx.CodeOf(gErr), gErr)
+		sErr := c.Set(cancelled, "", []byte("v"), 0)
+		assertEmptyKeyWins("Set", errorsx.CodeOf(sErr), sErr)
+		dErr := c.Delete(cancelled, "")
+		assertEmptyKeyWins("Delete", errorsx.CodeOf(dErr), dErr)
+		_, eErr := c.Exists(cancelled, "")
+		assertEmptyKeyWins("Exists", errorsx.CodeOf(eErr), eErr)
+	})
+
+	t.Run("PreExpiredCtxReturnsCtxError", func(t *testing.T) {
+		c := newCache(t)
+		expired, cancel := context.WithDeadline(ctx, time.Now().Add(-time.Hour))
+		defer cancel()
+		if _, err := c.Get(expired, "k"); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Get(expired deadline) err = %v, want context.DeadlineExceeded", err)
+		}
+		if err := c.Set(expired, "k", []byte("v"), 0); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Set(expired deadline) err = %v, want context.DeadlineExceeded", err)
+		}
+		if err := c.Delete(expired, "k"); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Delete(expired deadline) err = %v, want context.DeadlineExceeded", err)
+		}
+		if _, err := c.Exists(expired, "k"); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Exists(expired deadline) err = %v, want context.DeadlineExceeded", err)
+		}
+	})
+
 	t.Run("InputSliceNotAliased", func(t *testing.T) {
 		c := newCache(t)
 		v := []byte("hello")
