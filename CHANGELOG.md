@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-07-01
+
+Core-only release: the delivery/timing half of the `ports/jobs` conformance
+story, distilled from the semantics the first production adapter
+(`jobs/asynq`, v0.9.0 tag gate) proved. No contract surface change; additive
+exported test-helper API. No adapters dep-bump is required — existing adapters
+keep working against v0.10.0; future jobs adapters consume the new suite.
+
+### Added
+
+- `ports/jobs/jobstest` delivery/timing conformance suite:
+  - `RunDeliveryContract(t, factory)` — 11 interface-observable subtests run
+    against a real `Worker` (FailedAttemptRedelivered, NotBeforeProcessAt,
+    PastProcessAtEligible, RunReturnsNilOnCancel, PayloadMutationIsolated,
+    IDStableAcrossRedeliveries, HandlerCtxCancelledOnShutdown,
+    ExactTypeDispatchNoPrefix, DuplicateRegisterKeepsOriginal,
+    NewWorkerDeliversAfterStop, ConcurrentEnqueueSmoke). Asserts only what is
+    observable through `jobs.Enqueuer` / `jobs.Worker` / a test handler — no
+    backend introspection, no fault injection; introspection-bound criteria
+    (recoverable-state classification, retention, ack-lost, unreachable
+    backend, unhandled-job policy) stay in adapter tag-gate intent tests.
+  - `DeliveryFixture` (`Enqueuer` + `NewWorker func() jobs.Worker` + `Bounds`)
+    and `DeliveryBounds` (`ShutdownWithin` / `DeliverWithin` /
+    `RedeliverWithin` / `ProcessAtDelay`) — every bound is adapter-declared
+    and required (non-positive fails loud; no core defaults), and the fixture
+    MUST be retry-enabled (failed handler attempts redelivered within
+    `RedeliverWithin`).
+
+### Changed
+
+- `config` package doc now states explicitly that the viper-backed provider is
+  a deliberate in-process bootstrap default — core is infrastructure-client-free,
+  not literally interface-only — pointing at the recorded design boundary, so
+  the exception reads as policy rather than architecture drift.
+
 ## [0.10.0] - 2026-07-01
 
 Inbound request-throttling contract. Core adds `ports/ratelimit` — a single
