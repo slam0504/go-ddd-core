@@ -1,26 +1,38 @@
 # go-ddd-core State
 
-Last verified: 2026-07-02 Asia/Taipei (**v0.11.0 SHIPPED, core-only** —
-jobstest delivery/timing suite released: contract PR #29 (`511335a`) →
-release-prep PR #30 (`38b4470`, incl. config in-process-default package doc +
-decisions.md distill-item closure) → annotated tag `v0.11.0` + GitHub Release
-Latest. NO adapters dep-bump — existing adapters keep working against
-`v0.10.0`; future jobs adapters consume `jobstest.RunDeliveryContract`.
-Next per owner ruling: v1 criteria doc (`docs/v1-criteria.md`), then the
-`httpclient/std` adapter cycle in go-ddd-adapters.) Prior: 2026-07-01
-(`ports/ratelimit` **v0.10.0 SHIPPED,
-cross-repo cycle CLOSED** — both repos on matching `v0.10.0`; see the ratelimit
-block below for full PR/tag/release evidence.) Prior: 2026-06-16 (`ports/jobs`
-**v0.9.0 SHIPPED, cross-repo
-cycle CLOSED** — both repos on matching `v0.9.0`. Core: contract PR #22
-(`728c9d0`), release-prep PR #24 (`956314c`), annotated tag `v0.9.0` (object
-`8ef2fbe` → `956314c`) + GitHub Release Latest
-(https://github.com/slam0504/go-ddd-core/releases/tag/v0.9.0, `releases/latest`
-returns `v0.9.0`). Tag gate satisfied by the first adapter, `jobs/asynq` in
-`go-ddd-adapters` PR #29 (`1f8a685`), passing (0)+(a)–(v) under -race. Adapters
-dep-bump PR #30 (`040228b`) moved core pseudo-version → `v0.9.0` (root +
-examples/orders), adapters annotated tag `v0.9.0` (→ `040228b`) + GitHub
-Release Latest. See "Jobs Contract Cycle" below.)
+Last verified: 2026-07-02 Asia/Taipei (**v0.12.0 SHIPPED** — `ports/cache`
+maturation + cachetest conformance suite; cache/redis cycle CLOSED; adapters
+consumer `v0.11.0` tagged). Core main @ `12714d0` (release-prep PR #34).
+Annotated tag `v0.12.0` at `12714d0`, GitHub Release Latest.
+`go list -m go-ddd-core@v0.12.0` resolves via proxy. Note: core `v0.11.0`
+(jobstest delivery/timing suite, PRs #30/#31, tag `38b4470`) swept the cache
+cycle's TypedCache deletion (`579d6a9`) in UNRECORDED; corrected by core docs
+PR #32 (merge `21aa6f4`, CHANGELOG [0.11.0] + Release notes). Cross-repo
+version alignment dropped (adapters `v0.11.0` / core `v0.12.0`); see
+v0.12.0 section below. Prior: 2026-07-02 (**v0.11.0 SHIPPED, core-only** —
+jobstest delivery/timing suite: contract PR #29 (`511335a`) →
+release-prep PR #30 (`38b4470`) → annotated tag `v0.11.0` + GitHub Release
+Latest.) Prior: 2026-07-01 (`ports/ratelimit` **v0.10.0 SHIPPED,
+cross-repo cycle CLOSED** — both repos on matching `v0.10.0`.) Prior: 2026-06-16
+(`ports/jobs` **v0.9.0 SHIPPED, cross-repo cycle CLOSED**.)
+
+## ports/cache maturation + cachetest (v0.12.0, CLOSED 2026-07-02)
+
+`ports/cache` matured (TypedCache[T] deleted — BREAKING, `579d6a9`; Cache
+godoc tightened) and `ports/cache/cachetest` conformance suite SHIPPED
+(PR #33, merge `128d9eb`). Adapter consumer: `cache/redis` in adapters PR #33
+(merge `2c10eba`), CI 5/5 green incl. testcontainers. Core release-prep PR #34
+(merge `12714d0`) → annotated tag `v0.12.0` @ `12714d0`, GitHub Release Latest.
+
+- cachetest: `RunContract(t, Factory)`, 15 deterministic subtests — byte-ownership
+  aliasing invariants ×2, empty-key/negative-TTL precedence,
+  empty-key-precedes-cancelled-ctx, pre-expired-deadline (last 2 added at
+  Phase A final review); reference in-memory impl; non-vacuity proven dev-time.
+- Sweep incident: TypedCache deletion (`579d6a9`) was swept into core v0.11.0
+  UNRECORDED; corrected by docs PR #32 (`21aa6f4`). User decision: retarget
+  cache-cycle core tag to v0.12.0; adapter stays v0.11.0. Version alignment
+  dropped going forward.
+- Source: verified 2026-07-02 Asia/Taipei. Expiry: update at next core release.
 
 **`ports/ratelimit` — v0.10.0 SHIPPED, cross-repo cycle CLOSED** — the last
 A-quadrant gap in `docs/roadmap.md`, now released. Both repos on matching
