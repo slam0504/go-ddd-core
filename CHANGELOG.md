@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `ports/httpclient`: godoc rewritten to state the responsibility boundary
+  (ctx cancellation is the implementation's duty; closing `resp.Body` is the
+  caller's; redirects/retries/timeouts are adapter policy) and to note that
+  `Client` and `ContextualClient` cannot be implemented by one concrete type.
+  No API change.
+
 ## [0.12.0] - 2026-07-02
 
 Core-only release publishing the `ports/cache/cachetest` conformance suite.
