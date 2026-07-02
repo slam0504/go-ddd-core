@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-07-02
+
+Core-only release publishing the `ports/cache/cachetest` conformance suite.
+The `ports/cache` maturation (TypedCache[T] removal + tightened Cache godoc
+contract) already shipped in v0.11.0; v0.12.0 adds the deterministic RunContract
+suite so any Cache adapter can prove interface compliance. The tag gate was
+satisfied by the first `ports/cache` consumer — `cache/redis` in
+`go-ddd-adapters` (PR #33 there, merge `2c10eba`) — which ran
+`cachetest.RunContract` (15 subtests) green against real Redis in CI at the
+pseudo-version pin `v0.11.1-0.20260702035204-128d9eb1932a`. v0.12.0 is an
+additive minor.
+
+### Added
+
+- `ports/cache/cachetest` exported deterministic-only conformance suite
+  (`Factory`/`RunContract`, 15 subtests, fresh isolated Cache per subtest):
+  GetAbsentKeyReturnsErrMiss, SetThenGetReturnsValue, SetOverwriteWins,
+  OverwriteWithShorterValue, DeleteRemovesKey, DeleteAbsentKeyIsNoop,
+  EmptyKeyGetReturnsInvalidArgument, EmptyKeySetReturnsInvalidArgument,
+  EmptyKeyDeleteReturnsInvalidArgument, NilContextGetReturnsError,
+  NilContextSetReturnsError, NilContextDeleteReturnsError,
+  NegativeTTLReturnsInvalidArgument, EmptyKeyPrecedesCancelledCtx,
+  EmptyKeyPrecedesExpiredDeadline. Assertions use `errorsx.CodeOf`, never
+  HTTP status codes; imports only `testing`, `ports/cache`, and `pkg/errorsx`
+  — no transport dependency. TTL expiry and real-backend behaviour (network
+  outages, eviction) are adapter-level intent tests.
+
 ## [0.11.0] - 2026-07-01
 
 Core-only release: the delivery/timing half of the `ports/jobs` conformance
