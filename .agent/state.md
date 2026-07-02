@@ -1,6 +1,14 @@
 # go-ddd-core State
 
-Last verified: 2026-07-01 Asia/Taipei (`ports/ratelimit` **v0.10.0 SHIPPED,
+Last verified: 2026-07-02 Asia/Taipei (**v0.11.0 SHIPPED, core-only** —
+jobstest delivery/timing suite released: contract PR #29 (`511335a`) →
+release-prep PR #30 (`38b4470`, incl. config in-process-default package doc +
+decisions.md distill-item closure) → annotated tag `v0.11.0` + GitHub Release
+Latest. NO adapters dep-bump — existing adapters keep working against
+`v0.10.0`; future jobs adapters consume `jobstest.RunDeliveryContract`.
+Next per owner ruling: v1 criteria doc (`docs/v1-criteria.md`), then the
+`httpclient/std` adapter cycle in go-ddd-adapters.) Prior: 2026-07-01
+(`ports/ratelimit` **v0.10.0 SHIPPED,
 cross-repo cycle CLOSED** — both repos on matching `v0.10.0`; see the ratelimit
 block below for full PR/tag/release evidence.) Prior: 2026-06-16 (`ports/jobs`
 **v0.9.0 SHIPPED, cross-repo
