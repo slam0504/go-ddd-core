@@ -463,6 +463,24 @@ compensating control held until the adapter landed; with PR #29 merged and
 `(0)+(a)–(v)` green, core cut **v0.9.0** (release-prep PR + annotated tag +
 GitHub Release as Latest), same 2-step cross-repo close as v0.5.0–v0.8.0.
 
+**Delivery/timing half distilled (2026-07-01 → v0.11.0, CLOSED)**: the
+standing "distill after the first adapter lands" item above is done — core
+PR #29 shipped `jobstest.RunDeliveryContract` plus
+`DeliveryFixture`/`DeliveryBounds`/`DeliveryFactory`: 11 interface-observable
+subtests run against a real Worker with adapter-declared bounds
+(`ShutdownWithin`/`DeliverWithin`/`RedeliverWithin`/`ProcessAtDelay`; all
+required, non-positive fails loud; retry-enabled fixture precondition).
+Scope A deliberately excludes an Introspector / fault abstraction —
+introspection-bound criteria (g/t/f/h/n-inspection/s/u) stay in adapter
+tag-gate tests. Upgrade criterion: revisit an opt-in
+`RunRecoverabilityContract(t, factory, observer)` only if a SECOND production
+adapter (River / SQL queue) converges on the same observation shape; do not
+abstract from a single adapter's taxonomy. Non-vacuity is proven at
+development time (a no-retry backend fails the retry-dependent subtests) and
+only the GREEN reference self-test is committed — a permanently-failing
+subtest would propagate to the parent and break CI. Design spec:
+`docs/superpowers/specs/2026-07-01-jobstest-delivery-suite-design.md`.
+
 ## Rate Limiting Contract (`ports/ratelimit`, post-v0.9.0)
 
 - **Shape**: `Limiter.Allow(ctx, key) (Result, error)` — single-method thin
