@@ -63,7 +63,7 @@ func NameOf(q Query) string {
 		}
 	}
 	t := reflect.TypeOf(q)
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t.Name()
@@ -76,7 +76,7 @@ func NameOf(q Query) string {
 func nameOfType[Q any]() string {
 	t := reflect.TypeOf((*Q)(nil)).Elem()
 	var probe any
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		probe = reflect.New(t.Elem()).Interface()
 	} else {
 		var zero Q
@@ -87,7 +87,7 @@ func nameOfType[Q any]() string {
 			return s
 		}
 	}
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t.Name()

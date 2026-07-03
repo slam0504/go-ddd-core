@@ -18,13 +18,13 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
           cache: true
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.5.0
+          version: v2.12.2
 
   build-test:
     name: build + test
@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
           cache: true
 
       - name: go vet

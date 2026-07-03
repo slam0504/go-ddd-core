@@ -1,6 +1,6 @@
 module github.com/slam0504/go-ddd-core
 
-go 1.24
+go 1.26
 
 require (
 	github.com/ThreeDotsLabs/watermill v1.5.1

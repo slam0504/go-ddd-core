@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-03
+
+### Changed
+
+- **BREAKING (toolchain):** Minimum Go version is now **1.26** (`go.mod`
+  `go` directive and CI matrix, up from 1.24). Downstream consumers must
+  build with Go 1.26+; building with Go 1.24/1.25 will fail. No Go API
+  surface changed.
+- CI: bump `golangci/golangci-lint` to v2.12.2 (built with go1.26.2) so
+  the linter can target a go 1.26 module; modernize the deprecated
+  `reflect.Ptr` alias to `reflect.Pointer` (identical `Kind` constant).
+
 ## [0.13.0] - 2026-07-03
 
 ### Added
