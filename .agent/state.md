@@ -1,6 +1,17 @@
 # go-ddd-core State
 
-Last verified: 2026-07-02 Asia/Taipei (**v0.12.0 SHIPPED** — `ports/cache`
+Last verified: 2026-07-03 Asia/Taipei (**v0.14.0 SHIPPED, core-only** —
+minimum Go version raised 1.24 → 1.26; no Go API surface change. Core main @
+`731045b` (Merge PR #38). Annotated tag `v0.14.0` at `731045b`, GitHub Release
+Latest. Adapters still pin `v0.13.0` — cross-repo dep-bump DEFERRED to the
+adapter session, per operator: bump adapters go directive + CI + golangci-lint
+to 1.26/v2.12.2 and core dep `v0.13.0 → v0.14.0` together in one PR.) See
+"Go 1.26 toolchain bump" section below. NOTE: state.md header skipped
+**v0.13.0** (eventbus Inbox maturation + inboxtest, shipped 2026-07-03,
+CHANGELOG `[0.13.0]`, git `6dc5ef8`/`666a4bb`) — that cycle was not recorded
+in this file; details live in CHANGELOG.md, not here.
+
+Prior: 2026-07-02 Asia/Taipei (**v0.12.0 SHIPPED** — `ports/cache`
 maturation + cachetest conformance suite; cache/redis cycle CLOSED; adapters
 consumer `v0.11.0` tagged). Core main @ `12714d0` (release-prep PR #34).
 Annotated tag `v0.12.0` at `12714d0`, GitHub Release Latest.
@@ -15,6 +26,51 @@ release-prep PR #30 (`38b4470`) → annotated tag `v0.11.0` + GitHub Release
 Latest.) Prior: 2026-07-01 (`ports/ratelimit` **v0.10.0 SHIPPED,
 cross-repo cycle CLOSED** — both repos on matching `v0.10.0`.) Prior: 2026-06-16
 (`ports/jobs` **v0.9.0 SHIPPED, cross-repo cycle CLOSED**.)
+
+## Go 1.26 toolchain bump (v0.14.0, SHIPPED core-only 2026-07-03)
+
+Operator request: update core's Go version to latest. Latest stable is
+`go1.26.4` (verified via `go.dev/dl/?mode=json`; second line `go1.25.11`).
+Operator ruling: set the `go.mod` `go` directive to **1.26** (max, accepting
+that downstream must build with Go 1.26+); release as **v0.14.0** (minor —
+raising the minimum toolchain is a consumer-visible compatibility change, not
+a patch).
+
+**Shipped scope** — core PR #38 (`chore/bump-go-1.26` → `main`, Merge
+`731045b`):
+
+- `go.mod` `go 1.24` → `go 1.26` (`go mod tidy` left `go.sum` unchanged — no
+  dependency add/remove; the bump is a language-version declaration only).
+- `.github/workflows/ci.yml` — both jobs `go-version: "1.24"` → `"1.26"`.
+- `README.md` Requirements `Go 1.24+` → `Go 1.26+`.
+- CHANGELOG `[0.14.0] - 2026-07-03` (BREAKING toolchain note).
+
+**CI blocker found + fixed mid-PR** (surfaced by the go bump, caught by a
+Codex review + local preflight): the pinned `golangci-lint-action` v2.5.0
+binary was built with go1.25, so it rejected the go 1.26 module —
+`can't load config: the Go language version (go1.25) used to build
+golangci-lint is lower than the targeted Go version (1.26)`. Fix: bump
+`golangci/golangci-lint` version to **v2.12.2** (latest; binary verified
+first-hand as built with `go1.26.2`). The newer govet `inline` analyzer then
+flagged 6 uses of the deprecated `reflect.Ptr` alias in
+`application/command/command.go` + `application/query/query.go` → replaced
+with `reflect.Pointer` (identical `Kind` constant, behavior-preserving).
+Editor/gopls `interface{}→any` + `reflect.TypeOf→TypeFor` hints were NOT
+actioned — not in the CI golangci-lint enabled set (v2.12.2 reports 0 issues),
+out of scope for a version bump.
+
+**Verification** (local, Go 1.26): `golangci-lint v2.12.2 run ./...` → 0
+issues; `gofmt -l .` clean; `go vet ./...`, `go build ./...`,
+`go test -race ./...` all pass. GitHub CI on `731045b`: build+test PASS,
+golangci-lint PASS, `mergeStateStatus=CLEAN`. Annotated tag `v0.14.0` (→
+`731045b`) pushed; GitHub Release published as Latest
+(https://github.com/slam0504/go-ddd-core/releases/tag/v0.14.0).
+
+**Cross-repo — OPEN** (deferred to adapter session, per operator "合併後打
+tag我再通知adapter跟進"): `go-ddd-adapters` currently pins core `v0.13.0` and
+is unaffected. When followed up, adapters must (in one PR to keep CI green):
+`go.mod` go directive + CI → 1.26, `golangci-lint` → v2.12.2 (else same
+`go1.25 build < targeted 1.26` red CI), and core dep `v0.13.0 → v0.14.0`.
 
 ## ports/cache maturation + cachetest (v0.12.0, CLOSED 2026-07-02)
 
