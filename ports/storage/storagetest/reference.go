@@ -125,14 +125,17 @@ func (m *memStorage) List(ctx context.Context, opts storage.ListOptions) (storag
 	if err := ctx.Err(); err != nil {
 		return storage.ListPage{}, errorsx.Wrap(errorsx.CodeUnavailable, "storagetest: context done", err)
 	}
+
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Collect matching keys
 	keys := make([]string, 0, len(m.objects))
 	for k := range m.objects {
 		if strings.HasPrefix(k, opts.Prefix) {
 			keys = append(keys, k)
 		}
 	}
-	m.mu.Unlock()
 	sort.Strings(keys) // lexical order = this backend's stable walk order
 
 	page := storage.ListPage{}
@@ -144,11 +147,18 @@ func (m *memStorage) List(ctx context.Context, opts storage.ListOptions) (storag
 			page.NextToken = page.Objects[opts.Limit-1].Key
 			return page, nil
 		}
-		info, err := m.Stat(ctx, k)
-		if err != nil {
-			return storage.ListPage{}, err
+		// Build ObjectInfo inline from m.objects[k] without calling Stat.
+		// This keeps all work within a single critical section, avoiding TOCTOU
+		// between snapshot and Stat.
+		obj := m.objects[k]
+		info := storage.ObjectInfo{
+			Key:         k,
+			Size:        int64(len(obj.data)),
+			ContentType: obj.contentType,
+			ETag:        "", // empty ETag is contractually allowed
+			UpdatedAt:   obj.updatedAt,
+			Metadata:    nil, // List is not required to populate Metadata
 		}
-		info.Metadata = nil // List is not required to populate Metadata
 		page.Objects = append(page.Objects, info)
 	}
 	return page, nil
