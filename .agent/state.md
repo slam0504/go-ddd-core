@@ -3,10 +3,12 @@
 Last verified: 2026-07-03 Asia/Taipei (**v0.14.0 SHIPPED, core-only** —
 minimum Go version raised 1.24 → 1.26; no Go API surface change. Core main @
 `731045b` (Merge PR #38). Annotated tag `v0.14.0` at `731045b`, GitHub Release
-Latest. Adapters still pin `v0.13.0` — cross-repo dep-bump DEFERRED to the
-adapter session, per operator: bump adapters go directive + CI + golangci-lint
-to 1.26/v2.12.2 and core dep `v0.13.0 → v0.14.0` together in one PR.) See
-"Go 1.26 toolchain bump" section below. NOTE: state.md header skipped
+Latest. Go 1.26 cross-repo follow-up now **CLOSED 2026-07-03** — adapters
+adopted `go 1.26.0` + CI 1.26 + golangci-lint v2.12.2, folded into their core
+dep-bump to `v0.15.0` (PR #40); details in the "Go 1.26 toolchain bump"
+section below. NOTE: this header still reflects v0.14.0 and does not record
+the core **v0.15.0** cycle (storage maturation, tag `v0.15.0` @ `59aa9a0`,
+release/v0.15.0 PR #41) — that cycle's details are owned elsewhere. NOTE: state.md header skipped
 **v0.13.0** (eventbus Inbox maturation + inboxtest, shipped 2026-07-03,
 CHANGELOG `[0.13.0]`, git `6dc5ef8`/`666a4bb`) — that cycle was not recorded
 in this file; details live in CHANGELOG.md, not here.
@@ -66,11 +68,14 @@ golangci-lint PASS, `mergeStateStatus=CLEAN`. Annotated tag `v0.14.0` (→
 `731045b`) pushed; GitHub Release published as Latest
 (https://github.com/slam0504/go-ddd-core/releases/tag/v0.14.0).
 
-**Cross-repo — OPEN** (deferred to adapter session, per operator "合併後打
-tag我再通知adapter跟進"): `go-ddd-adapters` currently pins core `v0.13.0` and
-is unaffected. When followed up, adapters must (in one PR to keep CI green):
-`go.mod` go directive + CI → 1.26, `golangci-lint` → v2.12.2 (else same
-`go1.25 build < targeted 1.26` red CI), and core dep `v0.13.0 → v0.14.0`.
+**Cross-repo — CLOSED 2026-07-03** (adapter session followed up, verified
+read-only from core): `go-ddd-adapters` `go.mod` now declares `go 1.26.0`, CI
+`go-version: "1.26"` (both jobs), and `golangci-lint` `v2.12.2` — the exact
+1.26/v2.12.2 recipe flagged above. The core dep-bump was NOT a standalone
+`v0.13.0 → v0.14.0` step; adapters advanced core dep straight to **`v0.15.0`**
+(bundled with the storage/minio adapter cycle) in PR #40
+(`chore/bump-core-v0.15.0`). So the Go 1.26 toolchain follow-up landed folded
+into adapters' v0.15.0 dep-bump rather than a dedicated Go-only PR.
 
 ## ports/cache maturation + cachetest (v0.12.0, CLOSED 2026-07-02)
 
