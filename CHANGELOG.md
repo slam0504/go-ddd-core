@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `eventbus.ErrAlreadyRecorded` sentinel + `eventbus/inboxtest.RunContract`
+  (9 deterministic subtests): duplicate `Record` is now contractually an
+  error (never silent success), `Seen` is an advisory fast-path, and both
+  methods validate empty `Consumer`/`EventID` (`CodeInvalidArgument`,
+  before ctx, before backend).
+
 ### Changed
 
+- **BREAKING (semantics):** `eventbus.Inbox.Record` on an already-recorded
+  key must return `ErrAlreadyRecorded`; previously the contract was silent
+  and the reference in-process implementation treated it as a no-op.
 - `ports/httpclient`: godoc rewritten to state the responsibility boundary
   (ctx cancellation is the implementation's duty; closing `resp.Body` is the
   caller's; redirects/retries/timeouts are adapter policy) and to note that
