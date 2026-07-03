@@ -74,7 +74,7 @@ func NameOf(cmd Command) string {
 		}
 	}
 	t := reflect.TypeOf(cmd)
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t.Name()
@@ -89,7 +89,7 @@ func NameOf(cmd Command) string {
 func nameOfType[C any]() string {
 	t := reflect.TypeOf((*C)(nil)).Elem()
 	var probe any
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		probe = reflect.New(t.Elem()).Interface()
 	} else {
 		var zero C
@@ -100,7 +100,7 @@ func nameOfType[C any]() string {
 			return s
 		}
 	}
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t.Name()
