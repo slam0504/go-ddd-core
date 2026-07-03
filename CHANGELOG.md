@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING** `ports/storage`: `ObjectStorage.List` is now token-paginated
+  — `List(ctx, ListOptions{Prefix, Token, Limit}) (ListPage, error)` with an
+  adapter-owned opaque `NextToken` (`""` = walk complete; `Limit <= 0` is
+  `CodeInvalidArgument`). `ObjectInfo` gains `Metadata map[string]string`
+  (lowercase-ASCII portable keys). Operation semantics pinned in godoc:
+  unconditional overwrite Put (negative size rejected), idempotent Delete,
+  caller-closes Get, `ErrNotFound` as uncoded domain sentinel (errors.Is,
+  never CodeOf), empty-key/limit validation precedence before ctx before
+  backend, ETag demoted to opaque validator.
+
+### Added
+
+- `ports/storage/storagetest.RunContract`: deterministic conformance suite
+  for `ObjectStorage` implementations, with an in-memory reference
+  implementation. Presign is deliberately out of suite scope (proven
+  adapter-side against real backends).
+
 ## [0.14.0] - 2026-07-03
 
 ### Changed
