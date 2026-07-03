@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump minimum Go version to 1.26 (`go.mod` `go` directive and CI matrix).
+  Downstream consumers must build with Go 1.26+.
+
 ## [0.13.0] - 2026-07-03
 
 ### Added

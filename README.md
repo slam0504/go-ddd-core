@@ -53,7 +53,7 @@ docs/
 
 ## Requirements
 
-- Go 1.24+
+- Go 1.26+
 
 ## Dependencies (core only)
 
