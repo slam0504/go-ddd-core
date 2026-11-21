@@ -25,14 +25,18 @@ Last verified: 2026-05-15 Asia/Taipei
   produces multiple rows sharing one `EventID`.
 - `eventbus.Inbox` dedup is scoped by `eventbus.InboxKey{Consumer, EventID}`.
   Do not deduplicate by bare event id across all consumers.
-- `eventbus.Inbox` is **best-effort dedup**. `Inbox.Record` returns only
-  `error`; the `Memory` implementation silently no-ops on duplicate
-  (`eventbus/inbox/memory.go:73-75`), so the caller cannot distinguish
-  "first write" from "duplicate write". Concurrent redelivery can let
-  two workers both pass `Seen`, run the handler, then both `Record`
-  returns nil while side effects already duplicated. **Handlers must
-  therefore be idempotent**: at-least-once with best-effort dedup is
-  not effectively-once.
+- Duplicate `Inbox.Record` is an **error, never a silent success**
+  (contract since v0.13.0, `eventbus/inbox.go:23-43`). `Record` MUST
+  return `eventbus.ErrAlreadyRecorded` (possibly wrapped; callers test
+  with `errors.Is`) when the key is already recorded, including when the
+  conflict only surfaces at commit time under concurrent duplicate
+  delivery. Silent success cannot roll the caller's transaction back.
+  `Seen` is an advisory fast-path that may be stale under concurrency;
+  correctness rests on `Record` running in the same transaction as the
+  handler's side effects and the caller rolling back on
+  `ErrAlreadyRecorded`. Conformance suite: `eventbus/inboxtest`. This
+  replaces the pre-v0.13.0 "best-effort dedup, Memory silently no-ops"
+  wording; `review-log.md` Round 2 records that superseded failure mode.
 
 ## Command / Query Routing
 
